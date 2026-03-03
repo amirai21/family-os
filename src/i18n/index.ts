@@ -43,9 +43,14 @@ export function dayNameShort(dow: number): string {
   return he.daysShort[dow as keyof typeof he.daysShort] ?? "";
 }
 
-/** Hebrew grocery category label from English data key. */
+/** Hebrew grocery subcategory label from English data key. */
 export function groceryCategoryLabel(englishKey: string): string {
   return (he.groceryCategory as Record<string, string>)[englishKey] ?? englishKey;
+}
+
+/** Hebrew shopping category label (grocery/health/home). */
+export function shoppingCategoryLabel(key: string): string {
+  return (he.shoppingCategory as Record<string, string>)[key] ?? key;
 }
 
 /** Hebrew block type label from English type key. */

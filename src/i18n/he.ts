@@ -59,11 +59,21 @@ const he = {
   grocery: {
     title: "קניות",
     shoppingList: "רשימת קניות",
-    emptyList: "הרשימה ריקה — הוסיפו פריטים למטה!",
+    emptyGrocery: "אין פריטים במכולת עדיין",
+    emptyHealth: "אין פריטים בפארם עדיין",
+    emptyHome: "אין פריטים לבית עדיין",
     bought: "נקנו ({{count}})",
     clear: "נקה",
     quickAdd: "הוספה מהירה",
+    itemCount: "{{count}} פריטים",
   },
+
+  // ── Shopping categories ──
+  shoppingCategory: {
+    grocery: "מכולת",
+    health: "פארם",
+    home: "לבית",
+  } as Record<string, string>,
 
   // ── Kid schedule screen ──
   kid: {

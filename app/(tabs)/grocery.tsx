@@ -8,6 +8,7 @@ import {
   IconButton,
   Chip,
   Divider,
+  SegmentedButtons,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFamilyStore } from "@src/store/useFamilyStore";
@@ -17,14 +18,29 @@ import {
   clearBoughtRemote,
 } from "@src/lib/sync/remoteCrud";
 import GroceryAddModal from "@src/components/GroceryAddModal";
-import { t, groceryCategoryLabel } from "@src/i18n";
+import { t, groceryCategoryLabel, shoppingCategoryLabel } from "@src/i18n";
+import type { ShoppingCategory } from "@src/models/grocery";
+import { SHOPPING_CATEGORIES } from "@src/models/grocery";
+
+const EMPTY_KEYS: Record<ShoppingCategory, string> = {
+  grocery: "grocery.emptyGrocery",
+  health: "grocery.emptyHealth",
+  home: "grocery.emptyHome",
+};
 
 export default function GroceryScreen() {
   const grocery = useFamilyStore((s) => s.grocery);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<ShoppingCategory>("grocery");
 
-  const unbought = grocery.filter((g) => !g.isBought);
-  const bought = grocery.filter((g) => g.isBought);
+  const filtered = grocery.filter((g) => g.shoppingCategory === selectedCategory);
+  const unbought = filtered.filter((g) => !g.isBought);
+  const bought = filtered.filter((g) => g.isBought);
+
+  const segmentButtons = SHOPPING_CATEGORIES.map((cat) => ({
+    value: cat,
+    label: shoppingCategoryLabel(cat),
+  }));
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -33,15 +49,24 @@ export default function GroceryScreen() {
           {t("grocery.title")}
         </Text>
 
+        {/* Category tabs */}
+        <SegmentedButtons
+          value={selectedCategory}
+          onValueChange={(v) => setSelectedCategory(v as ShoppingCategory)}
+          buttons={segmentButtons}
+          style={styles.segments}
+        />
+
+        {/* Item count */}
+        <Text variant="bodySmall" style={styles.itemCount}>
+          {t("grocery.itemCount", { count: unbought.length })}
+        </Text>
+
         <Card style={styles.card} mode="elevated">
           <Card.Content>
-            <Text variant="titleMedium" style={styles.cardTitle}>
-              {t("grocery.shoppingList")}
-            </Text>
-
-            {grocery.length === 0 && (
+            {filtered.length === 0 && (
               <Text variant="bodyMedium" style={styles.cardBody}>
-                {t("grocery.emptyList")}
+                {t(EMPTY_KEYS[selectedCategory])}
               </Text>
             )}
 
@@ -54,9 +79,11 @@ export default function GroceryScreen() {
                 <View style={styles.rowText}>
                   <Text variant="bodyLarge" style={styles.itemTitle}>{item.title}</Text>
                   <View style={styles.meta}>
-                    <Chip compact textStyle={styles.chipText} style={styles.chip}>
-                      {groceryCategoryLabel(item.category)}
-                    </Chip>
+                    {item.subcategory ? (
+                      <Chip compact textStyle={styles.chipText} style={styles.chip}>
+                        {groceryCategoryLabel(item.subcategory)}
+                      </Chip>
+                    ) : null}
                     {item.qty ? (
                       <Text variant="bodySmall" style={styles.qty}>
                         x{item.qty}
@@ -79,7 +106,11 @@ export default function GroceryScreen() {
                   <Text variant="labelLarge" style={styles.boughtLabel}>
                     {t("grocery.bought", { count: bought.length })}
                   </Text>
-                  <Button compact onPress={clearBoughtRemote} textColor="#FF6B6B">
+                  <Button
+                    compact
+                    onPress={() => clearBoughtRemote(selectedCategory)}
+                    textColor="#FF6B6B"
+                  >
                     {t("grocery.clear")}
                   </Button>
                 </View>
@@ -123,6 +154,7 @@ export default function GroceryScreen() {
       <GroceryAddModal
         visible={modalOpen}
         onDismiss={() => setModalOpen(false)}
+        defaultShoppingCategory={selectedCategory}
       />
     </SafeAreaView>
   );
@@ -131,9 +163,10 @@ export default function GroceryScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#FAFAFE" },
   container: { padding: 20, paddingBottom: 40 },
-  title: { fontWeight: "800", color: "#1A1A2E", marginBottom: 20, textAlign: "right" },
+  title: { fontWeight: "800", color: "#1A1A2E", marginBottom: 16, textAlign: "right" },
+  segments: { marginBottom: 12 },
+  itemCount: { color: "#8E8BA8", marginBottom: 12, textAlign: "right" },
   card: { borderRadius: 16, backgroundColor: "#FFFFFF", marginBottom: 24 },
-  cardTitle: { fontWeight: "700", color: "#1A1A2E", marginBottom: 8, textAlign: "right" },
   cardBody: { color: "#6B6B8D", textAlign: "right" },
   row: {
     flexDirection: "row",

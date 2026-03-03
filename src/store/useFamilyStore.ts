@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import type { GroceryItem } from "@src/models/grocery";
+import type { GroceryItem, ShoppingCategory } from "@src/models/grocery";
 import type { Note } from "@src/models/note";
 import type { Chore } from "@src/models/chore";
 import type { Project, ProjectStatus } from "@src/models/project";
@@ -43,12 +43,13 @@ interface FamilyState {
   // Grocery actions
   addGrocery: (input: {
     title: string;
-    category: string;
+    shoppingCategory: ShoppingCategory;
+    subcategory?: string;
     qty?: string;
   }) => GroceryItem;
   toggleGroceryBought: (id: string) => void;
   deleteGrocery: (id: string) => void;
-  clearBought: () => string[];
+  clearBought: (shoppingCategory?: ShoppingCategory) => string[];
 
   // Notes actions
   addNote: (input: { title?: string; body: string }) => Note;
@@ -123,12 +124,13 @@ export const useFamilyStore = create<FamilyState>()(
 
       /* ── Grocery ── */
 
-      addGrocery: ({ title, category, qty }) => {
+      addGrocery: ({ title, shoppingCategory, subcategory, qty }) => {
         const now = Date.now();
         const item: GroceryItem = {
           id: makeId(),
           title,
-          category,
+          shoppingCategory,
+          subcategory,
           qty,
           isBought: false,
           updatedAt: now,
@@ -152,11 +154,13 @@ export const useFamilyStore = create<FamilyState>()(
           grocery: s.grocery.filter((g) => g.id !== id),
         })),
 
-      clearBought: () => {
-        const bought = get().grocery.filter((g) => g.isBought);
+      clearBought: (shoppingCategory) => {
+        const bought = get().grocery.filter(
+          (g) => g.isBought && (!shoppingCategory || g.shoppingCategory === shoppingCategory),
+        );
         const ids = bought.map((g) => g.id);
         set((s) => ({
-          grocery: s.grocery.filter((g) => !g.isBought),
+          grocery: s.grocery.filter((g) => !ids.includes(g.id)),
         }));
         return ids;
       },
@@ -294,7 +298,8 @@ export const useFamilyStore = create<FamilyState>()(
         })),
     }),
     {
-      name: "family-os-store-v1",
+      name: "family-os-store-v2",
+      version: 2,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         grocery: state.grocery,
@@ -305,6 +310,23 @@ export const useFamilyStore = create<FamilyState>()(
         scheduleBlocks: state.scheduleBlocks,
         lastSyncedAt: state.lastSyncedAt,
       }),
+      migrate: (persisted: any, version: number) => {
+        if (version < 2) {
+          // Migrate grocery items: category → subcategory, add shoppingCategory
+          const grocery = (persisted.grocery ?? []).map((g: any) => ({
+            ...g,
+            shoppingCategory: g.shoppingCategory ?? "grocery",
+            subcategory: g.subcategory ?? g.category ?? undefined,
+          }));
+          // Migrate chores: add selectedForToday if missing
+          const chores = (persisted.chores ?? []).map((c: any) => ({
+            ...c,
+            selectedForToday: c.selectedForToday ?? false,
+          }));
+          return { ...persisted, grocery, chores };
+        }
+        return persisted;
+      },
     }
   )
 );

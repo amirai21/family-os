@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
-import { GROCERY_CATEGORIES } from "@src/models/grocery";
+import { GROCERY_SUBCATEGORIES } from "@src/models/grocery";
+import type { ShoppingCategory } from "@src/models/grocery";
 import { addGroceryRemote } from "@src/lib/sync/remoteCrud";
 import { t, groceryCategoryLabel } from "@src/i18n";
 import ModalWrapper from "./ModalWrapper";
@@ -9,16 +10,28 @@ import ModalWrapper from "./ModalWrapper";
 interface Props {
   visible: boolean;
   onDismiss: () => void;
+  defaultShoppingCategory?: ShoppingCategory;
 }
 
-export default function GroceryAddModal({ visible, onDismiss }: Props) {
+export default function GroceryAddModal({
+  visible,
+  onDismiss,
+  defaultShoppingCategory = "grocery",
+}: Props) {
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("Produce");
+  const [subcategory, setSubcategory] = useState("Produce");
   const [qty, setQty] = useState("");
+
+  // Reset subcategory when modal opens with a new default
+  useEffect(() => {
+    if (visible) {
+      setSubcategory("Produce");
+    }
+  }, [visible]);
 
   const reset = () => {
     setTitle("");
-    setCategory("Produce");
+    setSubcategory("Produce");
     setQty("");
   };
 
@@ -26,7 +39,8 @@ export default function GroceryAddModal({ visible, onDismiss }: Props) {
     if (!title.trim()) return;
     addGroceryRemote({
       title: title.trim(),
-      category,
+      shoppingCategory: defaultShoppingCategory,
+      subcategory: subcategory || undefined,
       qty: qty.trim() || undefined,
     });
     reset();
@@ -57,12 +71,12 @@ export default function GroceryAddModal({ visible, onDismiss }: Props) {
         {t("groceryModal.category")}
       </Text>
       <View style={styles.categoryWrap}>
-        {GROCERY_CATEGORIES.map((cat) => (
+        {GROCERY_SUBCATEGORIES.map((cat) => (
           <Button
             key={cat}
-            mode={category === cat ? "contained" : "outlined"}
+            mode={subcategory === cat ? "contained" : "outlined"}
             compact
-            onPress={() => setCategory(cat)}
+            onPress={() => setSubcategory(cat)}
             style={styles.catChip}
             labelStyle={styles.catLabel}
           >
