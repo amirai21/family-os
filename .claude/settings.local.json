@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-expo-app@latest:*)",
+      "Bash(export PATH=\"/usr/local/bin:/opt/homebrew/bin:$HOME/.nvm/versions/node/*/bin:$HOME/.volta/bin:$HOME/.fnm/aliases/default/bin:$PATH\")",
+      "Bash(node --version:*)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(npx expo install:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx expo export:*)",
+      "Bash(npm ls:*)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(npx expo start:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:localhost)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(export PATH=/opt/homebrew/bin:$PATH)",
+      "Bash(git add:*)"
+    ]
+  }
+}
