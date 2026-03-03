@@ -143,7 +143,7 @@ export default function HomeScreen() {
                 <View style={styles.choreText}>
                   <Text
                     variant="bodyLarge"
-                    style={chore.done ? styles.choreDone : undefined}
+                    style={chore.done ? styles.choreDone : styles.choreTitle}
                   >
                     {chore.title}
                   </Text>
@@ -196,7 +196,7 @@ export default function HomeScreen() {
                   }}
                 >
                   <View style={styles.projectTop}>
-                    <Text variant="bodyLarge" style={{ flex: 1 }}>
+                    <Text variant="bodyLarge" style={styles.projectTitle}>
                       {proj.title}
                     </Text>
                     <Chip
@@ -302,7 +302,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   choreText: { flex: 1, marginStart: 4 },
-  choreDone: { textDecorationLine: "line-through", color: "#8E8BA8" },
+  choreTitle: { textAlign: "right" },
+  choreDone: { textDecorationLine: "line-through", color: "#8E8BA8", textAlign: "right" },
   assignee: { color: "#6B6B8D", textAlign: "right" },
 
   // Projects
@@ -319,6 +320,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  projectTitle: { flex: 1, textAlign: "right" },
   statusChip: { borderRadius: 12, height: 26 },
   projDesc: { color: "#6B6B8D", marginTop: 4, textAlign: "right" },
   progressBar: { height: 5, borderRadius: 3, marginTop: 8 },
