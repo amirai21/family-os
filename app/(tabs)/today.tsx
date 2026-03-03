@@ -1,12 +1,100 @@
-import { View, StyleSheet, ScrollView } from "react-native";
-import { Card, Text, Chip, Button, ActivityIndicator } from "react-native-paper";
+import React from "react";
+import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import { Card, Text, Button, ActivityIndicator } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { KIDS } from "@src/models/seed";
 import { useFamilyStore } from "@src/store/useFamilyStore";
+import { useKidBlocksForDay } from "@src/store/scheduleSelectors";
 import { syncAll } from "@src/lib/sync/syncEngine";
 import { useState } from "react";
-import { t, LOCALE } from "@src/i18n";
+import { t, LOCALE, blockTypeLabel } from "@src/i18n";
+import { minutesToHHMM } from "@src/utils/time";
+import type { BlockType } from "@src/models/schedule";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const TYPE_COLORS: Record<BlockType, string> = {
+  school: "#6C63FF",
+  hobby: "#FF6B6B",
+  other: "#4ECDC4",
+};
+
+const todayDow = new Date().getDay();
+
+// ---------------------------------------------------------------------------
+// KidTodayCard — shows a single kid's today schedule
+// ---------------------------------------------------------------------------
+
+interface Kid {
+  id: string;
+  name: string;
+  color: string;
+  emoji: string;
+}
+
+function KidTodayCard({ kid }: { kid: Kid }) {
+  const router = useRouter();
+  const blocks = useKidBlocksForDay(kid.id, todayDow);
+
+  return (
+    <Card style={[styles.kidCard, { borderColor: kid.color + "44" }]} mode="elevated">
+      <Pressable onPress={() => router.push(`/kid/${kid.id}`)}>
+        <View style={[styles.kidHeader, { backgroundColor: kid.color + "18" }]}>
+          <Text style={styles.kidEmoji}>{kid.emoji}</Text>
+          <Text
+            variant="titleMedium"
+            style={[styles.kidName, { color: kid.color }]}
+          >
+            {kid.name}
+          </Text>
+          <Text style={[styles.kidArrow, { color: kid.color }]}>‹</Text>
+        </View>
+      </Pressable>
+
+      <View style={styles.kidBody}>
+        {blocks.length === 0 ? (
+          <Text variant="bodySmall" style={styles.noSchedule}>
+            {t("today.noSchedule")}
+          </Text>
+        ) : (
+          blocks.map((block) => {
+            const color = block.color ?? kid.color;
+            const typeColor = TYPE_COLORS[block.type];
+            return (
+              <View key={block.id} style={styles.blockRow}>
+                <View style={[styles.blockStripe, { backgroundColor: color }]} />
+                <View style={styles.blockInfo}>
+                  <Text variant="bodyMedium" style={styles.blockTitle}>
+                    {block.title}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.blockTime}>
+                    {minutesToHHMM(block.startMinutes)} – {minutesToHHMM(block.endMinutes)}
+                    {block.location ? `  ·  ${block.location}` : ""}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.blockType,
+                    { color: typeColor, backgroundColor: typeColor + "22" },
+                  ]}
+                >
+                  {blockTypeLabel(block.type)}
+                </Text>
+              </View>
+            );
+          })
+        )}
+      </View>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
 
 export default function TodayScreen() {
   const grocery = useFamilyStore((s) => s.grocery);
@@ -118,23 +206,13 @@ export default function TodayScreen() {
           </Card.Content>
         </Card>
 
-        {/* Kids */}
+        {/* Kids — per-kid today schedule */}
         <Text variant="titleMedium" style={styles.sectionTitle}>
           {t("today.kids")}
         </Text>
-        <View style={styles.kidsRow}>
-          {displayKids.map((kid) => (
-            <Chip
-              key={kid.id}
-              onPress={() => router.push(`/kid/${kid.id}`)}
-              style={[styles.kidChip, { backgroundColor: kid.color + "22" }]}
-              textStyle={{ color: kid.color, fontWeight: "700" }}
-              icon={() => <Text style={{ fontSize: 18 }}>{kid.emoji}</Text>}
-            >
-              {kid.name}
-            </Chip>
-          ))}
-        </View>
+        {displayKids.map((kid) => (
+          <KidTodayCard key={kid.id} kid={kid} />
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -174,6 +252,48 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 28, fontWeight: "800", textAlign: "center" },
   statLabel: { fontSize: 12, color: "#6B6B8D", marginTop: 2, textAlign: "center" },
   sectionTitle: { fontWeight: "700", color: "#1A1A2E", marginBottom: 12, textAlign: "right" },
-  kidsRow: { flexDirection: "row", gap: 12, marginBottom: 24 },
-  kidChip: { borderRadius: 20 },
+
+  // Kid today cards
+  kidCard: {
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  kidHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  kidEmoji: { fontSize: 22, marginEnd: 10 },
+  kidName: { flex: 1, fontWeight: "700", textAlign: "right" },
+  kidArrow: { fontSize: 20, fontWeight: "700" },
+  kidBody: { paddingHorizontal: 16, paddingBottom: 14 },
+  noSchedule: { color: "#8E8BA8", textAlign: "right", paddingVertical: 4 },
+
+  // Block rows inside kid cards
+  blockRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  blockStripe: {
+    width: 4,
+    borderRadius: 2,
+    alignSelf: "stretch",
+    marginEnd: 10,
+  },
+  blockInfo: { flex: 1 },
+  blockTitle: { fontWeight: "600", color: "#1A1A2E", textAlign: "right" },
+  blockTime: { color: "#6B6B8D", marginTop: 2, textAlign: "right" },
+  blockType: {
+    fontSize: 10,
+    fontWeight: "600",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
 });

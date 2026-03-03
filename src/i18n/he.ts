@@ -35,6 +35,7 @@ const he = {
     activeProjects: "פרויקטים פעילים",
     pinnedNotes: "פתקים נעוצים",
     kids: "ילדים",
+    noSchedule: "אין תכנון להיום",
     never: "אף פעם",
   },
 
