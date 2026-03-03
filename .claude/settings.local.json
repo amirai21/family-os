@@ -16,7 +16,17 @@
       "WebFetch(domain:localhost)",
       "mcp__Claude_Preview__preview_start",
       "Bash(export PATH=/opt/homebrew/bin:$PATH)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npx drizzle-kit generate:*)",
+      "Bash(npm run db:migrate:*)",
+      "Bash(npm run db:seed:*)",
+      "Bash(npm run db:smoke:*)",
+      "Bash(find:*)",
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm run db:migrate:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npx tsc:*)",
+      "Bash(PATH=\"/opt/homebrew/bin:$PATH\" npm run db:smoke:*)"
     ]
   }
 }
