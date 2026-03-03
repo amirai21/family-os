@@ -55,7 +55,8 @@ function fireAndForget(promise: Promise<unknown>, label: string) {
 
 export function addGroceryRemote(input: {
   title: string;
-  category: string;
+  shoppingCategory: import("@src/models/grocery").ShoppingCategory;
+  subcategory?: string;
   qty?: string;
 }) {
   const item = useFamilyStore.getState().addGrocery(input);
@@ -87,8 +88,8 @@ export function deleteGroceryRemote(id: string) {
   );
 }
 
-export function clearBoughtRemote() {
-  const ids = useFamilyStore.getState().clearBought();
+export function clearBoughtRemote(shoppingCategory?: import("@src/models/grocery").ShoppingCategory) {
+  const ids = useFamilyStore.getState().clearBought(shoppingCategory);
   fireAndForget(
     getFamilyId().then((fid) =>
       Promise.all(ids.map((id) => groceryApi.delete(fid, id))),

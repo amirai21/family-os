@@ -26,7 +26,8 @@ export interface ApiGroceryItem {
   id: string;
   familyId: string;
   title: string;
-  category: string;
+  shoppingCategory: string;
+  subcategory: string | null;
   qty: string | null;
   isBought: boolean;
   createdAt: string;

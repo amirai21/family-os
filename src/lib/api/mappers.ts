@@ -13,7 +13,7 @@ import type {
   ApiKid,
   ApiScheduleBlock,
 } from "./types";
-import type { GroceryItem } from "@src/models/grocery";
+import type { GroceryItem, ShoppingCategory } from "@src/models/grocery";
 import type { Note } from "@src/models/note";
 import type { Chore } from "@src/models/chore";
 import type { Project } from "@src/models/project";
@@ -30,7 +30,8 @@ export function apiToLocalGrocery(a: ApiGroceryItem): GroceryItem {
   return {
     id: a.id,
     title: a.title,
-    category: a.category,
+    shoppingCategory: (a.shoppingCategory || "grocery") as ShoppingCategory,
+    subcategory: a.subcategory ?? undefined,
     qty: a.qty ?? undefined,
     isBought: a.isBought,
     updatedAt: toMs(a.updatedAt),
@@ -42,7 +43,8 @@ export function localToApiGrocery(item: GroceryItem) {
   return {
     id: item.id,
     title: item.title,
-    category: item.category,
+    shoppingCategory: item.shoppingCategory,
+    subcategory: item.subcategory ?? null,
     qty: item.qty ?? null,
     isBought: item.isBought,
   };

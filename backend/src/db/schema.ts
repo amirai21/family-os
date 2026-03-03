@@ -109,7 +109,8 @@ export const groceryItems = pgTable(
       .notNull()
       .references(() => families.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
-    category: text("category").notNull(),
+    shoppingCategory: text("shopping_category").default("grocery").notNull(),
+    subcategory: text("subcategory"),
     qty: text("qty"),
     isBought: boolean("is_bought").default(false).notNull(),
     ...timestamps,
@@ -117,6 +118,7 @@ export const groceryItems = pgTable(
   (t) => [
     index("grocery_items_family_id_idx").on(t.familyId),
     index("grocery_items_family_bought_idx").on(t.familyId, t.isBought),
+    index("grocery_items_family_shop_cat_idx").on(t.familyId, t.shoppingCategory),
   ],
 );
 
