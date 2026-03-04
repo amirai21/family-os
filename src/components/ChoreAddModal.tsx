@@ -1,23 +1,35 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
-import { addChoreRemote } from "@src/lib/sync/remoteCrud";
+import { addChoreRemote, updateChoreRemote } from "@src/lib/sync/remoteCrud";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import { t } from "@src/i18n";
+import type { Chore } from "@src/models/chore";
 import ModalWrapper from "./ModalWrapper";
 
 interface Props {
   visible: boolean;
   onDismiss: () => void;
+  editChore?: Chore | null;
 }
 
-export default function ChoreAddModal({ visible, onDismiss }: Props) {
+export default function ChoreAddModal({ visible, onDismiss, editChore }: Props) {
   const familyMembers = useFamilyStore((s) => s.familyMembers);
   const activeMembers = familyMembers.filter((m) => m.isActive);
   const [title, setTitle] = useState("");
   const [assignedToMemberId, setAssignedToMemberId] = useState<
     string | undefined
   >(undefined);
+
+  useEffect(() => {
+    if (editChore) {
+      setTitle(editChore.title);
+      setAssignedToMemberId(editChore.assignedToMemberId);
+    } else {
+      setTitle("");
+      setAssignedToMemberId(undefined);
+    }
+  }, [editChore, visible]);
 
   const reset = () => {
     setTitle("");
@@ -26,10 +38,17 @@ export default function ChoreAddModal({ visible, onDismiss }: Props) {
 
   const handleSubmit = () => {
     if (!title.trim()) return;
-    addChoreRemote({
-      title: title.trim(),
-      assignedToMemberId: assignedToMemberId || undefined,
-    });
+    if (editChore) {
+      updateChoreRemote(editChore.id, {
+        title: title.trim(),
+        assignedToMemberId: assignedToMemberId || undefined,
+      });
+    } else {
+      addChoreRemote({
+        title: title.trim(),
+        assignedToMemberId: assignedToMemberId || undefined,
+      });
+    }
     reset();
     onDismiss();
   };
@@ -42,7 +61,7 @@ export default function ChoreAddModal({ visible, onDismiss }: Props) {
   return (
     <ModalWrapper visible={visible} onDismiss={handleDismiss}>
       <Text variant="titleLarge" style={styles.heading}>
-        {t("choreModal.title")}
+        {editChore ? t("choreModal.editTitle") : t("choreModal.title")}
       </Text>
 
       <TextInput
@@ -95,7 +114,7 @@ export default function ChoreAddModal({ visible, onDismiss }: Props) {
           onPress={handleSubmit}
           disabled={!title.trim()}
         >
-          {t("add")}
+          {editChore ? t("save") : t("add")}
         </Button>
       </View>
     </ModalWrapper>

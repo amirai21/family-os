@@ -68,6 +68,10 @@ interface FamilyState {
 
   // Chores actions
   addChore: (input: { title: string; assignedTo?: string; assignedToMemberId?: string }) => Chore;
+  updateChore: (
+    id: string,
+    patch: Partial<Pick<Chore, "title" | "assignedToMemberId">>
+  ) => void;
   toggleChoreDone: (id: string) => void;
   toggleChoreSelectedForToday: (id: string) => void;
   deleteChore: (id: string) => void;
@@ -279,6 +283,13 @@ export const useFamilyStore = create<FamilyState>()(
         set((s) => ({ chores: [item, ...s.chores] }));
         return item;
       },
+
+      updateChore: (id, patch) =>
+        set((s) => ({
+          chores: s.chores.map((c) =>
+            c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c
+          ),
+        })),
 
       toggleChoreDone: (id) =>
         set((s) => ({

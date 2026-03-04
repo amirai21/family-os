@@ -38,7 +38,7 @@ const STATUS_COLORS: Record<string, string> = {
 // ChoreRow — reusable row for both sections
 // ---------------------------------------------------------------------------
 
-function ChoreRow({ chore }: { chore: Chore }) {
+function ChoreRow({ chore, onEdit }: { chore: Chore; onEdit: () => void }) {
   const assignedMember = useFamilyStore((s) =>
     chore.assignedToMemberId
       ? s.familyMembers.find((m) => m.id === chore.assignedToMemberId)
@@ -68,6 +68,11 @@ function ChoreRow({ chore }: { chore: Chore }) {
         ) : null}
       </View>
       <IconButton
+        icon="pencil-outline"
+        size={18}
+        onPress={onEdit}
+      />
+      <IconButton
         icon={chore.selectedForToday ? "white-balance-sunny" : "white-balance-sunny"}
         size={18}
         iconColor={chore.selectedForToday ? "#FFA726" : "#D0D0D0"}
@@ -96,6 +101,7 @@ export default function HomeScreen() {
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [choreModalOpen, setChoreModalOpen] = useState(false);
+  const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
@@ -185,7 +191,10 @@ export default function HomeScreen() {
               <IconButton
                 icon="plus"
                 size={20}
-                onPress={() => setChoreModalOpen(true)}
+                onPress={() => {
+                  setEditingChore(null);
+                  setChoreModalOpen(true);
+                }}
               />
             </View>
 
@@ -202,7 +211,14 @@ export default function HomeScreen() {
                   ⭐ {t("home.selectedForToday")}
                 </Text>
                 {selectedChores.map((chore) => (
-                  <ChoreRow key={chore.id} chore={chore} />
+                  <ChoreRow
+                    key={chore.id}
+                    chore={chore}
+                    onEdit={() => {
+                      setEditingChore(chore);
+                      setChoreModalOpen(true);
+                    }}
+                  />
                 ))}
               </>
             )}
@@ -221,7 +237,14 @@ export default function HomeScreen() {
                   </Text>
                 )}
                 {backlogChores.map((chore) => (
-                  <ChoreRow key={chore.id} chore={chore} />
+                  <ChoreRow
+                    key={chore.id}
+                    chore={chore}
+                    onEdit={() => {
+                      setEditingChore(chore);
+                      setChoreModalOpen(true);
+                    }}
+                  />
                 ))}
               </>
             )}
@@ -320,7 +343,11 @@ export default function HomeScreen() {
       />
       <ChoreAddModal
         visible={choreModalOpen}
-        onDismiss={() => setChoreModalOpen(false)}
+        onDismiss={() => {
+          setChoreModalOpen(false);
+          setEditingChore(null);
+        }}
+        editChore={editingChore}
       />
       <ProjectModal
         visible={projectModalOpen}
