@@ -11,6 +11,27 @@ familyRoutes.get("/", async (c) => {
   return c.json(rows);
 });
 
+// POST /v1/family — create a new family
+familyRoutes.post("/", async (c) => {
+  const body = await c.req.json();
+  const [row] = await db
+    .insert(families)
+    .values({ name: body.name ?? "" })
+    .returning();
+  return c.json(row, 201);
+});
+
+// GET /v1/family/:familyId — get a single family by ID
+familyRoutes.get("/:familyId", async (c) => {
+  const familyId = c.req.param("familyId");
+  const [row] = await db
+    .select()
+    .from(families)
+    .where(eq(families.id, familyId));
+  if (!row) return c.json({ error: "Not found" }, 404);
+  return c.json(row);
+});
+
 // PUT /v1/family/:familyId — update family (e.g. name)
 familyRoutes.put("/:familyId", async (c) => {
   const familyId = c.req.param("familyId");

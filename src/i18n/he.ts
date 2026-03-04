@@ -44,6 +44,7 @@ const he = {
     noEventsForToday: "אין אירועים להיום",
     wholeFamily: "כל המשפחה",
     never: "אף פעם",
+    addNote: "פתק חדש",
   },
 
   // ── Home screen ──
@@ -247,6 +248,31 @@ const he = {
   // ── Family badge ──
   familyBadge: {
     prefix: "משפחת",
+  },
+
+  // ── Auth screens ──
+  auth: {
+    loginTitle: "התחברות",
+    registerTitle: "הרשמה",
+    username: "שם משתמש",
+    password: "סיסמה",
+    familyCode: "קוד משפחה (אופציונלי)",
+    login: "התחבר",
+    register: "צור חשבון",
+    noAccount: "אין לך חשבון? הרשמה",
+    hasAccount: "כבר יש לך חשבון? התחברות",
+    usernameMin: "שם משתמש חייב להכיל לפחות 3 תווים",
+    passwordMin: "סיסמה חייבת להכיל לפחות 4 תווים",
+    usernameTaken: "שם המשתמש תפוס",
+    userNotFound: "משתמש לא נמצא",
+    wrongPassword: "סיסמה שגויה",
+    invalidFamilyCode: "קוד משפחה לא תקין",
+    genericError: "שגיאה — נסו שנית",
+    loading: "טוען…",
+    logout: "התנתק",
+    account: "חשבון",
+    loggedInAs: "מחובר בתור:",
+    familyIdLabel: "מזהה משפחה:",
   },
 
   // ── Settings screen ──

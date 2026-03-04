@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { I18nManager, Platform } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { PaperProvider, Snackbar } from "react-native-paper";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import {
@@ -12,6 +13,8 @@ import {
   Rubik_800ExtraBold,
 } from "@expo-google-fonts/rubik";
 import { theme } from "@src/theme/theme";
+import { useFamilyStore } from "@src/store/useFamilyStore";
+import { useAuthStore } from "@src/auth/useAuthStore";
 import { pullAll } from "@src/lib/sync/syncEngine";
 import { setSyncErrorHandler } from "@src/lib/sync/remoteCrud";
 import { seedScheduleIfEmpty } from "@src/store/scheduleSeed";
@@ -27,10 +30,6 @@ if (!I18nManager.isRTL) {
 
 if (Platform.OS === "web" && typeof document !== "undefined") {
   document.documentElement.lang = "he";
-  // Note: We do NOT set dir="rtl" or inject direction CSS here.
-  // I18nManager.forceRTL(true) handles logical property flipping (marginStart, etc.)
-  // and textAlign:"right" is set per-component. Setting CSS direction:rtl would
-  // double-reverse flex rows since JSX children are already in RTL visual order.
 }
 
 SplashScreen.preventAutoHideAsync();
@@ -42,6 +41,22 @@ export default function RootLayout() {
     "Rubik-Bold": Rubik_700Bold,
     "Rubik-ExtraBold": Rubik_800ExtraBold,
   });
+
+  // Wait for Zustand to rehydrate from AsyncStorage/localStorage before rendering.
+  const [hydrated, setHydrated] = useState(
+    useFamilyStore.persist.hasHydrated(),
+  );
+  useEffect(() => {
+    if (hydrated) return;
+    return useFamilyStore.persist.onFinishHydration(() => setHydrated(true));
+  }, [hydrated]);
+
+  // Bootstrap auth — load session from SecureStore
+  const authStatus = useAuthStore((s) => s.status);
+  const bootstrap = useAuthStore((s) => s.bootstrap);
+  useEffect(() => {
+    bootstrap();
+  }, [bootstrap]);
 
   const [snackMsg, setSnackMsg] = useState("");
   const [snackVisible, setSnackVisible] = useState(false);
@@ -56,44 +71,82 @@ export default function RootLayout() {
     setSyncErrorHandler(showSnack);
   }, [showSnack]);
 
-  // Pull from backend first, then seed only if collections are still empty
+  // Pull from backend once hydration + auth are complete.
+  // Re-runs on every fresh login (sessionIssuedAt changes each time).
+  // Logout clears family data via useAuthStore.logout().
+  const authFamilyId = useAuthStore((s) => s.session?.user.familyId ?? null);
+  const sessionIssuedAt = useAuthStore((s) => s.session?.issuedAt ?? 0);
   useEffect(() => {
-    pullAll()
-      .catch((err) => {
-        console.warn("[sync] Initial pull failed:", err.message);
-      })
-      .finally(() => {
+    if (!hydrated || authStatus !== "loggedIn" || !authFamilyId) return;
+
+    console.log("[sync] Pulling data for family:", authFamilyId);
+    pullAll(authFamilyId)
+      .then(() => {
+        console.log("[sync] Pull succeeded");
+        // Only seed AFTER a successful pull — prevents duplicate seeding on failure
         seedFamilyMembersIfEmpty();
         seedKidsIfEmpty();
         seedScheduleIfEmpty();
+      })
+      .catch((err) => {
+        console.warn("[sync] Initial pull failed:", err.message);
       });
-  }, []);
+  }, [hydrated, authStatus, authFamilyId, sessionIssuedAt]);
 
-  // Hide splash once fonts are loaded
+  // Hide splash once fonts are loaded, store hydrated, and auth resolved
+  const ready = fontsLoaded && hydrated && authStatus !== "booting";
   useEffect(() => {
-    if (fontsLoaded) {
+    if (ready) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [ready]);
 
-  if (!fontsLoaded) return null;
+  if (!ready) return null;
 
   return (
-    <PaperProvider theme={theme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="kid/[kidId]" options={{ headerShown: true }} />
-      </Stack>
-      <StatusBar style="dark" />
-      <Snackbar
-        visible={snackVisible}
-        onDismiss={() => setSnackVisible(false)}
-        duration={3000}
-        action={{ label: t("ok"), onPress: () => setSnackVisible(false) }}
-      >
-        {snackMsg}
-      </Snackbar>
-    </PaperProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider theme={theme}>
+        <AuthGate />
+        <Stack>
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="kid/[kidId]" options={{ headerShown: true }} />
+        </Stack>
+        <StatusBar style="dark" />
+        <Snackbar
+          visible={snackVisible}
+          onDismiss={() => setSnackVisible(false)}
+          duration={3000}
+          action={{ label: t("ok"), onPress: () => setSnackVisible(false) }}
+        >
+          {snackMsg}
+        </Snackbar>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
+}
+
+// ---------------------------------------------------------------------------
+// AuthGate — redirects based on auth status (renders nothing)
+// ---------------------------------------------------------------------------
+
+function AuthGate() {
+  const status = useAuthStore((s) => s.status);
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "booting") return;
+
+    const inAuth = segments[0] === "(auth)";
+
+    if (status === "loggedOut" && !inAuth) {
+      router.replace("/(auth)/login");
+    } else if (status === "loggedIn" && inAuth) {
+      router.replace("/(tabs)/today");
+    }
+  }, [status, segments, router]);
+
+  return null;
 }

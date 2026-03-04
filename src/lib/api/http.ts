@@ -34,11 +34,17 @@ async function request<T>(
       },
     });
 
-    const json = await res.json();
+    if (!res.ok) {
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        body = await res.text().catch(() => "Unknown error");
+      }
+      throw new ApiError(res.status, body);
+    }
 
-    if (!res.ok) throw new ApiError(res.status, json);
-
-    return json as T;
+    return (await res.json()) as T;
   } finally {
     clearTimeout(timer);
   }
