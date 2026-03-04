@@ -111,6 +111,7 @@ const he = {
   // ── Chore Add Modal ──
   choreModal: {
     title: "הוספת מטלה",
+    editTitle: "עריכת מטלה",
     whatNeedsDoing: "מה צריך לעשות?",
     assignedTo: "מוקצה ל (אופציונלי)",
     selectMember: "משויך ל:",

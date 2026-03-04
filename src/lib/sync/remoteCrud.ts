@@ -187,6 +187,21 @@ export function addChoreRemote(input: {
   );
 }
 
+export function updateChoreRemote(
+  id: string,
+  patch: Partial<Pick<Chore, "title" | "assignedToMemberId">>,
+) {
+  useFamilyStore.getState().updateChore(id, patch);
+  const item = useFamilyStore.getState().chores.find((c) => c.id === id);
+  if (!item) return;
+  fireAndForget(
+    getFamilyId().then((fid) =>
+      choresApi.upsert(fid, localToApiChore(item)),
+    ),
+    "Update chore",
+  );
+}
+
 export function toggleChoreDoneRemote(id: string) {
   useFamilyStore.getState().toggleChoreDone(id);
   const item = useFamilyStore.getState().chores.find((c) => c.id === id);
