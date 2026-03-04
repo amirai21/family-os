@@ -29,6 +29,8 @@ export const familyApi = {
   list: () => http.get<ApiFamily[]>("/v1/family"),
   get: (familyId: string) =>
     http.get<ApiFamily>(`/v1/family/${familyId}`),
+  getByName: (name: string) =>
+    http.get<ApiFamily>(`/v1/family/by-name/${encodeURIComponent(name)}`),
   create: (data: { name: string }) =>
     http.post<ApiFamily>("/v1/family", data),
   update: (familyId: string, data: { name: string }) =>
