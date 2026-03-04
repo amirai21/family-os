@@ -1,11 +1,11 @@
 /**
- * ScheduleBlockModal — Add / edit a weekly schedule block.
+ * ScheduleBlockModal — Add / edit a schedule block (recurring or one-time).
  * Uses react-hook-form + zod for validation.
  */
 
 import React, { useEffect } from "react";
 import { View, StyleSheet } from "react-native";
-import { Text, TextInput, Button } from "react-native-paper";
+import { Text, TextInput, Button, SegmentedButtons } from "react-native-paper";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { ScheduleBlock, BlockType } from "@src/models/schedule";
 import { BLOCK_TYPES } from "@src/models/schedule";
 import { hhmmToMinutes, minutesToHHMM } from "@src/utils/time";
+import { dayOfWeekFromYMD, toYMD } from "@src/utils/date";
 import { t, dayNameShort, blockTypeLabel } from "@src/i18n";
 import ModalWrapper from "./ModalWrapper";
 
@@ -21,12 +22,15 @@ import ModalWrapper from "./ModalWrapper";
 // ---------------------------------------------------------------------------
 
 const timeRegex = /^\d{1,2}:\d{2}$/;
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 const schema = z
   .object({
     title: z.string().min(1, t("blockModal.titleRequired")),
     type: z.enum(["school", "hobby", "other"]),
+    isRecurring: z.boolean(),
     dayOfWeek: z.number().int().min(0).max(6),
+    date: z.string().optional(),
     startTime: z
       .string()
       .regex(timeRegex, t("blockModal.useHHMM"))
@@ -44,6 +48,21 @@ const schema = z
       return !isNaN(s) && !isNaN(e) && e > s;
     },
     { message: t("blockModal.endAfterStart"), path: ["endTime"] },
+  )
+  .refine(
+    (d) => {
+      if (d.isRecurring) return true;
+      // One-time event must have a valid date
+      if (!d.date || !dateRegex.test(d.date)) return false;
+      const [y, m, day] = d.date.split("-").map(Number);
+      const dateObj = new Date(y, m - 1, day);
+      return (
+        dateObj.getFullYear() === y &&
+        dateObj.getMonth() === m - 1 &&
+        dateObj.getDate() === day
+      );
+    },
+    { message: t("blockModal.invalidDate"), path: ["date"] },
   );
 
 type FormData = z.infer<typeof schema>;
@@ -57,6 +76,7 @@ interface Props {
   onDismiss: () => void;
   editBlock?: ScheduleBlock | null;
   defaultDayOfWeek?: number;
+  defaultDate?: string; // "YYYY-MM-DD" — pre-fill date for one-time events from calendar
   onSubmit: (data: {
     title: string;
     type: BlockType;
@@ -64,6 +84,8 @@ interface Props {
     startMinutes: number;
     endMinutes: number;
     location?: string;
+    isRecurring: boolean;
+    date?: string;
   }) => void;
 }
 
@@ -76,6 +98,7 @@ export default function ScheduleBlockModal({
   onDismiss,
   editBlock,
   defaultDayOfWeek = 1,
+  defaultDate,
   onSubmit,
 }: Props) {
   const {
@@ -90,7 +113,9 @@ export default function ScheduleBlockModal({
     defaultValues: {
       title: "",
       type: "other",
+      isRecurring: true,
       dayOfWeek: defaultDayOfWeek,
+      date: defaultDate ?? toYMD(new Date()),
       startTime: "09:00",
       endTime: "10:00",
       location: "",
@@ -103,7 +128,9 @@ export default function ScheduleBlockModal({
       reset({
         title: editBlock.title,
         type: editBlock.type,
+        isRecurring: editBlock.isRecurring,
         dayOfWeek: editBlock.dayOfWeek,
+        date: editBlock.date ?? toYMD(new Date()),
         startTime: minutesToHHMM(editBlock.startMinutes),
         endTime: minutesToHHMM(editBlock.endMinutes),
         location: editBlock.location ?? "",
@@ -112,25 +139,34 @@ export default function ScheduleBlockModal({
       reset({
         title: "",
         type: "other",
+        isRecurring: true,
         dayOfWeek: defaultDayOfWeek,
+        date: defaultDate ?? toYMD(new Date()),
         startTime: "09:00",
         endTime: "10:00",
         location: "",
       });
     }
-  }, [visible, editBlock, defaultDayOfWeek, reset]);
+  }, [visible, editBlock, defaultDayOfWeek, defaultDate, reset]);
 
   const selectedType = watch("type");
   const selectedDay = watch("dayOfWeek");
+  const isRecurring = watch("isRecurring");
 
   const doSubmit = (data: FormData) => {
+    const dayOfWeek = data.isRecurring
+      ? data.dayOfWeek
+      : dayOfWeekFromYMD(data.date!);
+
     onSubmit({
       title: data.title.trim(),
       type: data.type,
-      dayOfWeek: data.dayOfWeek,
+      dayOfWeek,
       startMinutes: hhmmToMinutes(data.startTime),
       endMinutes: hhmmToMinutes(data.endTime),
       location: data.location?.trim() || undefined,
+      isRecurring: data.isRecurring,
+      date: data.isRecurring ? undefined : data.date,
     });
     onDismiss();
   };
@@ -179,24 +215,65 @@ export default function ScheduleBlockModal({
         ))}
       </View>
 
-      {/* Day of week */}
-      <Text variant="labelLarge" style={styles.label}>
-        {t("blockModal.day")}
-      </Text>
-      <View style={styles.chipRow}>
-        {Array.from({ length: 7 }, (_, idx) => (
-          <Button
-            key={idx}
-            mode={selectedDay === idx ? "contained" : "outlined"}
-            compact
-            onPress={() => setValue("dayOfWeek", idx)}
-            style={styles.chip}
-            labelStyle={styles.chipLabel}
-          >
-            {dayNameShort(idx)}
-          </Button>
-        ))}
-      </View>
+      {/* Recurring / One-time toggle */}
+      <SegmentedButtons
+        value={isRecurring ? "recurring" : "oneTime"}
+        onValueChange={(v) => setValue("isRecurring", v === "recurring")}
+        buttons={[
+          { value: "recurring", label: t("blockModal.recurring") },
+          { value: "oneTime", label: t("blockModal.oneTime") },
+        ]}
+        style={styles.segmented}
+      />
+
+      {/* Day of week — only for recurring */}
+      {isRecurring && (
+        <>
+          <Text variant="labelLarge" style={styles.label}>
+            {t("blockModal.day")}
+          </Text>
+          <View style={styles.chipRow}>
+            {Array.from({ length: 7 }, (_, idx) => (
+              <Button
+                key={idx}
+                mode={selectedDay === idx ? "contained" : "outlined"}
+                compact
+                onPress={() => setValue("dayOfWeek", idx)}
+                style={styles.chip}
+                labelStyle={styles.chipLabel}
+              >
+                {dayNameShort(idx)}
+              </Button>
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* Date picker — only for one-time events */}
+      {!isRecurring && (
+        <>
+          <Text variant="labelLarge" style={styles.label}>
+            {t("blockModal.date")}
+          </Text>
+          <Controller
+            control={control}
+            name="date"
+            render={({ field: { onChange, value } }) => (
+              <TextInput
+                value={value}
+                onChangeText={onChange}
+                mode="outlined"
+                style={styles.rtlInput}
+                placeholder="2026-03-15"
+                error={!!errors.date}
+              />
+            )}
+          />
+          {errors.date && (
+            <Text style={styles.error}>{errors.date.message}</Text>
+          )}
+        </>
+      )}
 
       {/* Times */}
       <View style={styles.timeRow}>
@@ -280,6 +357,7 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 },
   chip: { borderRadius: 20 },
   chipLabel: { fontSize: 12 },
+  segmented: { marginBottom: 10, marginTop: 4 },
   timeRow: { flexDirection: "row", gap: 12 },
   timeCol: { flex: 1 },
   error: { color: "#FF6B6B", fontSize: 12, marginBottom: 4, marginTop: -4 },

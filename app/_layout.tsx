@@ -26,15 +26,11 @@ if (!I18nManager.isRTL) {
 }
 
 if (Platform.OS === "web" && typeof document !== "undefined") {
-  document.documentElement.dir = "rtl";
   document.documentElement.lang = "he";
-
-  // Force RTL direction for flex layout. We only set `direction` here;
-  // text-align is handled per-component via RN StyleSheet so that
-  // Paper TextInput floating labels aren't broken.
-  const style = document.createElement("style");
-  style.textContent = "* { direction: rtl !important; }";
-  document.head.appendChild(style);
+  // Note: We do NOT set dir="rtl" or inject direction CSS here.
+  // I18nManager.forceRTL(true) handles logical property flipping (marginStart, etc.)
+  // and textAlign:"right" is set per-component. Setting CSS direction:rtl would
+  // double-reverse flex rows since JSX children are already in RTL visual order.
 }
 
 SplashScreen.preventAutoHideAsync();

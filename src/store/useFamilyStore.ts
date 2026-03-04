@@ -101,13 +101,15 @@ interface FamilyState {
     endMinutes: number;
     location?: string;
     color?: string;
+    isRecurring?: boolean;
+    date?: string;
   }) => ScheduleBlock;
   updateScheduleBlock: (
     id: string,
     patch: Partial<
       Pick<
         ScheduleBlock,
-        "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color"
+        "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date"
       >
     >
   ) => void;
@@ -299,6 +301,8 @@ export const useFamilyStore = create<FamilyState>()(
         const block: ScheduleBlock = {
           id: makeId(),
           ...input,
+          isRecurring: input.isRecurring ?? true,
+          date: input.date,
           createdAt: now,
           updatedAt: now,
         };
@@ -385,7 +389,7 @@ export const useFamilyStore = create<FamilyState>()(
     }),
     {
       name: "family-os-store-v2",
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         grocery: state.grocery,
@@ -427,6 +431,14 @@ export const useFamilyStore = create<FamilyState>()(
             isActive: k.isActive ?? true,
             createdAt: k.createdAt ?? Date.now(),
             updatedAt: k.updatedAt ?? Date.now(),
+          }));
+        }
+        if (version < 5) {
+          // Add isRecurring + date to schedule blocks
+          persisted.scheduleBlocks = (persisted.scheduleBlocks ?? []).map((b: any) => ({
+            ...b,
+            isRecurring: b.isRecurring ?? true,
+            date: b.date ?? undefined,
           }));
         }
         return persisted;

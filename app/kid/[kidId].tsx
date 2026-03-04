@@ -19,7 +19,11 @@ import { useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 
 import { useFamilyStore } from "@src/store/useFamilyStore";
-import { useKidBlocks, useKidBlocksForDay } from "@src/store/scheduleSelectors";
+import {
+  useKidBlocks,
+  useKidBlocksForDate,
+  useKidOneTimeBlocks,
+} from "@src/store/scheduleSelectors";
 import {
   addScheduleBlockRemote,
   updateScheduleBlockRemote,
@@ -59,9 +63,14 @@ function BlockRow({
     <Pressable style={styles.blockRow} onPress={onEdit}>
       <View style={[styles.blockStripe, { backgroundColor: color }]} />
       <View style={styles.blockInfo}>
-        <Text variant="bodyMedium" style={styles.blockTitle}>
-          {block.title}
-        </Text>
+        <View style={styles.blockTitleRow}>
+          <Text variant="bodyMedium" style={styles.blockTitle}>
+            {block.title}
+          </Text>
+          {!block.isRecurring && (
+            <Text style={styles.oneTimeBadge}>{t("kid.oneTimeEvent")}</Text>
+          )}
+        </View>
         <Text variant="bodySmall" style={styles.blockTime}>
           {minutesToHHMM(block.startMinutes)} – {minutesToHHMM(block.endMinutes)}
           {block.location ? `  ·  ${block.location}` : ""}
@@ -108,9 +117,10 @@ export default function KidScheduleScreen() {
   // Calendar state
   const [selectedDate, setSelectedDate] = useState(toYMD(new Date()));
   const selectedDow = dayOfWeekFromYMD(selectedDate);
-  const dayBlocks = useKidBlocksForDay(kidId!, selectedDow);
+  // Shows both recurring blocks for this DOW and one-time events on this exact date
+  const dayBlocks = useKidBlocksForDate(kidId!, selectedDate, selectedDow);
 
-  // Template — all blocks grouped by day
+  // Template — all recurring blocks grouped by day
   const allBlocks = useKidBlocks(kidId!);
   const blocksByDay = useMemo(() => {
     const map: Record<number, ScheduleBlock[]> = {};
@@ -120,6 +130,9 @@ export default function KidScheduleScreen() {
     }
     return map;
   }, [allBlocks]);
+
+  // One-time events for calendar dots
+  const oneTimeBlocks = useKidOneTimeBlocks(kidId!);
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
@@ -145,6 +158,8 @@ export default function KidScheduleScreen() {
     startMinutes: number;
     endMinutes: number;
     location?: string;
+    isRecurring: boolean;
+    date?: string;
   }) => {
     if (editingBlock) {
       updateScheduleBlockRemote(editingBlock.id, data);
@@ -153,10 +168,10 @@ export default function KidScheduleScreen() {
     }
   };
 
-  // Build markedDates for calendar: any day-of-week that has blocks gets a dot
+  // Build markedDates for calendar
   const markedDates = useMemo(() => {
     const marks: Record<string, { dotColor: string }> = {};
-    // Mark 60 days around today for blocks that exist
+    // Recurring blocks: mark 60 days around today for days-of-week that have blocks
     const now = new Date();
     for (let offset = -30; offset <= 30; offset++) {
       const d = new Date(now);
@@ -167,8 +182,14 @@ export default function KidScheduleScreen() {
         marks[ymd] = { dotColor: kidColor };
       }
     }
+    // One-time events: mark their specific dates
+    for (const b of oneTimeBlocks) {
+      if (b.date) {
+        marks[b.date] = { dotColor: kidColor };
+      }
+    }
     return marks;
-  }, [blocksByDay, kidColor]);
+  }, [blocksByDay, oneTimeBlocks, kidColor]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
@@ -231,7 +252,7 @@ export default function KidScheduleScreen() {
             </>
           )}
 
-          {/* --- Template View --- */}
+          {/* --- Template View (recurring only) --- */}
           {tab === "template" && (
             <>
               {Array.from({ length: 7 }, (_, dow) => (
@@ -284,6 +305,7 @@ export default function KidScheduleScreen() {
           }}
           editBlock={editingBlock}
           defaultDayOfWeek={modalDay}
+          defaultDate={tab === "calendar" ? selectedDate : undefined}
           onSubmit={handleSubmit}
         />
     </SafeAreaView>
@@ -324,9 +346,24 @@ const styles = StyleSheet.create({
     marginEnd: 10,
   },
   blockInfo: { flex: 1 },
+  blockTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   blockTitle: { fontWeight: "600", color: "#1A1A2E", textAlign: "right" },
   blockTime: { color: "#6B6B8D", marginTop: 2, textAlign: "right" },
   typeChip: { borderRadius: 10, height: 24, marginEnd: 4 },
+  oneTimeBadge: {
+    fontSize: 9,
+    color: "#FFA726",
+    backgroundColor: "#FFA72622",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: "hidden",
+    fontWeight: "600",
+  },
 
   // Template
   templateDay: {

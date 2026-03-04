@@ -91,6 +91,8 @@ export interface ApiScheduleBlock {
   endMinutes: number;
   location: string | null;
   color: string | null;
+  date: string | null;
+  isRecurring: boolean;
   createdAt: string;
   updatedAt: string;
 }
