@@ -21,6 +21,18 @@ familyRoutes.post("/", async (c) => {
   return c.json(row, 201);
 });
 
+// GET /v1/family/by-name/:name — find a family by name (for cross-device login)
+familyRoutes.get("/by-name/:name", async (c) => {
+  const name = c.req.param("name");
+  const [row] = await db
+    .select()
+    .from(families)
+    .where(eq(families.name, name))
+    .limit(1);
+  if (!row) return c.json({ error: "Not found" }, 404);
+  return c.json(row);
+});
+
 // GET /v1/family/:familyId — get a single family by ID
 familyRoutes.get("/:familyId", async (c) => {
   const familyId = c.req.param("familyId");

@@ -53,20 +53,38 @@ class DummyAuthServiceImpl implements AuthService {
   async login(input: LoginInput): Promise<AuthSession> {
     const { username, password } = input;
 
+    // 1. Try local lookup first (same device that registered)
     const entry = await findUserByUsername(username);
-    if (!entry) {
+    if (entry) {
+      if (entry.password !== password) {
+        throw new Error("WRONG_PASSWORD");
+      }
+      const now = Date.now();
+      const token = `dummy_${entry.user.id}_${now}`;
+      const session: AuthSession = { token, user: entry.user, issuedAt: now };
+      await saveSession(session);
+      return session;
+    }
+
+    // 2. No local user — check backend for an existing family with this name.
+    //    This enables cross-device login (e.g. registered on web, logging in
+    //    from iOS simulator). Password check is skipped since we use dummy auth.
+    try {
+      const family = await familyApi.getByName(username);
+      const now = Date.now();
+      const userId = makeId();
+      const user = { id: userId, username, familyId: family.id, createdAt: now };
+      const token = `dummy_${userId}_${now}`;
+      const session: AuthSession = { token, user, issuedAt: now };
+
+      // Cache credentials locally so future logins on this device are instant
+      await saveUserCredentials(username, password, user);
+      await saveSession(session);
+      return session;
+    } catch {
+      // Backend unreachable or family not found → user truly doesn't exist
       throw new Error("USER_NOT_FOUND");
     }
-    if (entry.password !== password) {
-      throw new Error("WRONG_PASSWORD");
-    }
-
-    const now = Date.now();
-    const token = `dummy_${entry.user.id}_${now}`;
-    const session: AuthSession = { token, user: entry.user, issuedAt: now };
-
-    await saveSession(session);
-    return session;
   }
 
   async logout(): Promise<void> {
