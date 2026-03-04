@@ -39,8 +39,8 @@ app.onError((err, c) => {
   return c.json({ error: err.message }, 500);
 });
 
-// Health check (Cloud Run uses this)
-app.get("/healthz", (c) => c.json({ status: "ok", service: "family-os-api" }));
+// Health check
+app.get("/health", (c) => c.json({ status: "ok", service: "family-os-api" }));
 
 // Routes
 app.route("/v1/family", familyRoutes);
