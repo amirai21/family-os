@@ -71,6 +71,13 @@
       "when": 1773110000000,
       "tag": "0009_push_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773200000000,
+      "tag": "0010_users_auth",
+      "breakpoints": true
     }
   ]
 }

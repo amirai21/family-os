@@ -8,9 +8,7 @@
 
 import { create } from "zustand";
 import type { AuthSession, RegisterInput, LoginInput } from "./types";
-import { authService } from "./DummyAuthService";
-import { familyApi } from "@src/lib/api/endpoints";
-import { ApiError } from "@src/lib/api/http";
+import { authService } from "./ApiAuthService";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import {
   clearFamilyCache,
@@ -40,22 +38,24 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const session = await authService.getSession();
       if (session) {
-        // Validate the family still exists in the DB.
-        // Only invalidate on a definitive 404/500 — NOT on network errors
+        // Validate the JWT is still valid by hitting /v1/auth/me.
+        // Only invalidate on a definitive 401/403 — NOT on network errors
         // (so the app still works offline with cached data).
         try {
-          await familyApi.get(session.user.familyId);
-        } catch (err) {
-          if (err instanceof ApiError) {
-            // Server responded but family doesn't exist → stale session
-            console.warn("[auth] Stale session — family not found, logging out");
+          const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
+          const res = await fetch(`${BASE_URL}/v1/auth/me`, {
+            headers: { Authorization: `Bearer ${session.token}` },
+          });
+          if (res.status === 401 || res.status === 403) {
+            console.warn("[auth] Token expired or invalid, logging out");
             await authService.logout();
             resetFamilyData();
             set({ session: null, status: "loggedOut", error: undefined });
             return;
           }
+        } catch {
           // Network error / timeout → keep session, let sync handle it later
-          console.warn("[auth] Could not validate family (offline?), keeping session");
+          console.warn("[auth] Could not validate token (offline?), keeping session");
         }
         set({ session, status: "loggedIn", error: undefined });
       } else {

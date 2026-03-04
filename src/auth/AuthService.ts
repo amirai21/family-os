@@ -1,8 +1,8 @@
 /**
  * auth/AuthService.ts — Interface for auth operations.
  *
- * Consumers depend on this interface only. Swap DummyAuthService for
- * ApiAuthService later without changing UI code.
+ * Consumers depend on this interface only. The concrete implementation
+ * (ApiAuthService) can be swapped without changing UI code.
  */
 
 import type { AuthSession, RegisterInput, LoginInput } from "./types";

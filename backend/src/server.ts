@@ -13,6 +13,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
+import { authRoutes } from "./routes/auth.js";
 import { familyRoutes } from "./routes/family.js";
 import { groceryRoutes } from "./routes/grocery.js";
 import { notesRoutes } from "./routes/notes.js";
@@ -24,6 +25,7 @@ import { familyMembersRoutes } from "./routes/familyMembers.js";
 import { familyEventsRoutes } from "./routes/familyEvents.js";
 import { pushTokenRoutes } from "./routes/pushTokens.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { jwtAuth, familyGuard } from "./middleware/auth.js";
 
 // ---------------------------------------------------------------------------
 // App
@@ -44,7 +46,14 @@ app.onError((err, c) => {
 // Health check
 app.get("/health", (c) => c.json({ status: "ok", service: "family-os-api" }));
 
-// Routes
+// Auth routes (unauthenticated)
+app.route("/v1/auth", authRoutes);
+
+// Auth middleware for all family-scoped routes
+app.use("/v1/family/*", jwtAuth);
+app.use("/v1/family/:familyId/*", familyGuard);
+
+// Family routes (protected by middleware above)
 app.route("/v1/family", familyRoutes);
 app.route("/v1/family/:familyId/grocery", groceryRoutes);
 app.route("/v1/family/:familyId/notes", notesRoutes);
