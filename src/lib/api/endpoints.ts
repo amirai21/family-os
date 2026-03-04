@@ -27,6 +27,10 @@ const fam = (familyId: string) => `/v1/family/${familyId}`;
 
 export const familyApi = {
   list: () => http.get<ApiFamily[]>("/v1/family"),
+  get: (familyId: string) =>
+    http.get<ApiFamily>(`/v1/family/${familyId}`),
+  create: (data: { name: string }) =>
+    http.post<ApiFamily>("/v1/family", data),
   update: (familyId: string, data: { name: string }) =>
     http.put<ApiFamily>(`/v1/family/${familyId}`, data),
 };

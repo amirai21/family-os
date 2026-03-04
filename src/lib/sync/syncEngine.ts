@@ -42,25 +42,48 @@ import {
 // Pull (server → local)
 // ---------------------------------------------------------------------------
 
-export async function pullAll(): Promise<void> {
+export async function pullAll(familyIdOverride?: string): Promise<void> {
   const store = useFamilyStore.getState();
   store.setSyncStatus("syncing");
 
   try {
-    const fid = await getFamilyId();
+    const fid = familyIdOverride ?? (await getFamilyId());
 
-    const [familyList, grocery, notes, chores, projects, kids, scheduleBlocks, familyMembers, familyEvents] =
-      await Promise.all([
-        familyApi.list(),
-        groceryApi.list(fid),
-        notesApi.list(fid),
-        choresApi.list(fid),
-        projectsApi.list(fid),
-        kidsApi.list(fid),
-        scheduleBlocksApi.list(fid),
-        familyMembersApi.list(fid),
-        familyEventsApi.list(fid),
-      ]);
+    // Use allSettled so one failing endpoint doesn't kill the entire sync
+    const results = await Promise.allSettled([
+      familyApi.list(),
+      groceryApi.list(fid),
+      notesApi.list(fid),
+      choresApi.list(fid),
+      projectsApi.list(fid),
+      kidsApi.list(fid),
+      scheduleBlocksApi.list(fid),
+      familyMembersApi.list(fid),
+      familyEventsApi.list(fid),
+    ]);
+
+    const val = <T,>(r: PromiseSettledResult<T>, fallback: T): T =>
+      r.status === "fulfilled" ? r.value : fallback;
+
+    const familyList = val(results[0], []);
+    const grocery = val(results[1], []);
+    const notes = val(results[2], []);
+    const chores = val(results[3], []);
+    const projects = val(results[4], []);
+    const kids = val(results[5], []);
+    const scheduleBlocks = val(results[6], []);
+    const familyMembers = val(results[7], []);
+    const familyEvents = val(results[8], []);
+
+    // Log any failures
+    const failures = results
+      .map((r, i) => (r.status === "rejected" ? i : null))
+      .filter((i) => i !== null);
+    if (failures.length > 0) {
+      const names = ["families", "grocery", "notes", "chores", "projects", "kids", "scheduleBlocks", "members", "events"];
+      const failedNames = failures.map((i) => names[i]).join(", ");
+      console.warn(`[sync] Partial pull — failed: ${failedNames}`);
+    }
 
     // Set family name from matching family
     const currentFamily = familyList.find((f) => f.id === fid);
@@ -77,7 +100,8 @@ export async function pullAll(): Promise<void> {
     store.setFamilyMembers(familyMembers.map(apiToLocalFamilyMember));
     store.setFamilyEvents(familyEvents.map(apiToLocalFamilyEvent));
     store.setLastSyncedAt(Date.now());
-    store.setSyncStatus("idle");
+    store.setSyncStatus(failures.length > 0 ? "error" : "idle",
+      failures.length > 0 ? "Partial sync" : undefined);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Sync pull failed";
     store.setSyncStatus("error", msg);

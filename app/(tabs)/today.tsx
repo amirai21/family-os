@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import {
   Card,
@@ -10,18 +10,20 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import type { Kid } from "@src/models/kid";
+import type { Note } from "@src/models/note";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import { useKidBlocksForDate } from "@src/store/scheduleSelectors";
 import { useTodayFamilyEvents } from "@src/store/familyEventSelectors";
 import { toYMD } from "@src/utils/date";
 import { syncAll } from "@src/lib/sync/syncEngine";
 import { toggleChoreDoneRemote } from "@src/lib/sync/remoteCrud";
-import { useState } from "react";
 import { t, LOCALE, blockTypeLabel, assigneeTypeLabel } from "@src/i18n";
 import { minutesToHHMM } from "@src/utils/time";
 import type { BlockType } from "@src/models/schedule";
 import type { AssigneeType } from "@src/models/familyEvent";
 import FamilyBadge from "@src/components/FamilyBadge";
+import PinnedNotesCarousel from "@src/components/PinnedNotesCarousel";
+import NoteModal from "@src/components/NoteModal";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -118,6 +120,9 @@ export default function TodayScreen() {
   const lastSyncedAt = useFamilyStore((s) => s.lastSyncedAt);
 
   const [syncing, setSyncing] = useState(false);
+  const [carouselOpen, setCarouselOpen] = useState(false);
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
   const router = useRouter();
 
   const activeKids = kids.filter((k) => k.isActive);
@@ -127,7 +132,11 @@ export default function TodayScreen() {
   const inProgressProjects = projects.filter(
     (p) => p.status === "in_progress"
   ).length;
-  const pinnedNotes = notes.filter((n) => n.pinned).length;
+  const pinnedNotesList = useMemo(
+    () => notes.filter((n) => n.pinned),
+    [notes],
+  );
+  const pinnedNotes = pinnedNotesList.length;
 
   const todayChores = chores.filter((c) => c.selectedForToday);
   const todayEvents = useTodayFamilyEvents(todayDate, todayDow);
@@ -212,15 +221,55 @@ export default function TodayScreen() {
                 </Text>
                 <Text style={styles.statLabel}>{t("today.activeProjects")}</Text>
               </View>
-              <View style={[styles.stat, { backgroundColor: "#FFF3E0" }]}>
+              <Pressable
+                style={[styles.stat, { backgroundColor: "#FFF3E0" }]}
+                onPress={() => setCarouselOpen((v) => !v)}
+              >
                 <Text style={[styles.statNum, { color: "#FFA726" }]}>
                   {pinnedNotes}
                 </Text>
-                <Text style={styles.statLabel}>{t("today.pinnedNotes")}</Text>
-              </View>
+                <Text style={styles.statLabel}>
+                  {t("today.pinnedNotes")} {carouselOpen ? "▲" : "▼"}
+                </Text>
+              </Pressable>
             </View>
           </Card.Content>
         </Card>
+
+        {/* Pinned notes carousel */}
+        {carouselOpen && pinnedNotesList.length > 0 && (
+          <PinnedNotesCarousel
+            notes={pinnedNotesList}
+            onNotePress={(note) => {
+              setEditingNote(note);
+              setNoteModalOpen(true);
+            }}
+            onAddPress={() => {
+              setEditingNote(null);
+              setNoteModalOpen(true);
+            }}
+          />
+        )}
+        {carouselOpen && pinnedNotesList.length === 0 && (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content style={styles.emptyCarousel}>
+              <Text variant="bodyMedium" style={styles.emptyCarouselText}>
+                {t("home.noNotes")}
+              </Text>
+              <Button
+                mode="contained"
+                compact
+                onPress={() => {
+                  setEditingNote(null);
+                  setNoteModalOpen(true);
+                }}
+                style={styles.emptyCarouselBtn}
+              >
+                {t("today.addNote")}
+              </Button>
+            </Card.Content>
+          </Card>
+        )}
 
         {/* Today's chores */}
         <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -329,6 +378,15 @@ export default function TodayScreen() {
           <KidTodayCard key={kid.id} kid={kid} />
         ))}
       </ScrollView>
+
+      <NoteModal
+        visible={noteModalOpen}
+        onDismiss={() => {
+          setNoteModalOpen(false);
+          setEditingNote(null);
+        }}
+        editNote={editingNote}
+      />
     </SafeAreaView>
   );
 }
@@ -379,6 +437,11 @@ const styles = StyleSheet.create({
   choreDoneText: { textDecorationLine: "line-through", color: "#8E8BA8", textAlign: "right" },
   choreAssignee: { color: "#6B6B8D", textAlign: "right" },
   choreEmpty: { color: "#8E8BA8", textAlign: "right" },
+
+  // Pinned notes carousel empty
+  emptyCarousel: { alignItems: "center", paddingVertical: 16 },
+  emptyCarouselText: { color: "#8E8BA8", textAlign: "center", marginBottom: 12 },
+  emptyCarouselBtn: { borderRadius: 12, backgroundColor: "#FFA726" },
 
   // Kid today cards
   kidCard: {

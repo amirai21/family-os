@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS "family_events" (
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
-
+--> statement-breakpoint
 CREATE INDEX "family_events_family_id_idx" ON "family_events" ("family_id");
+--> statement-breakpoint
 CREATE INDEX "family_events_family_dow_idx" ON "family_events" ("family_id", "day_of_week");

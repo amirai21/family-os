@@ -31,6 +31,12 @@ const app = new Hono();
 app.use("*", cors());
 app.use("*", logger());
 
+// Global error handler — return JSON instead of plain text
+app.onError((err, c) => {
+  console.error("[API ERROR]", c.req.method, c.req.path, err.message);
+  return c.json({ error: err.message }, 500);
+});
+
 // Health check
 app.get("/", (c) => c.json({ status: "ok", service: "family-os-api" }));
 

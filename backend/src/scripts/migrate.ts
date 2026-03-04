@@ -50,6 +50,7 @@ async function main() {
     "chores",
     "projects",
     "schedule_blocks",
+    "family_events",
   ];
 
   for (const table of tables) {
