@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   },
   card: { borderRadius: 16, backgroundColor: "#FFFFFF", marginBottom: 24 },
   sectionHeader: {
-    flexDirection: "row",
+    flexDirection: Platform.OS === "web" ? "row-reverse" : "row",
     alignItems: "center",
     marginBottom: 8,
   },
