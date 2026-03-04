@@ -7,6 +7,7 @@ import {
   timestamp,
   index,
   check,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -44,6 +45,7 @@ export const familiesRelations = relations(families, ({ many }) => ({
   projects: many(projects),
   scheduleBlocks: many(scheduleBlocks),
   familyEvents: many(familyEvents),
+  pushTokens: many(pushTokens),
 }));
 
 // ---------------------------------------------------------------------------
@@ -311,6 +313,7 @@ export const familyEvents = pgTable(
     color: text("color"),
     isRecurring: boolean("is_recurring").default(true).notNull(),
     date: text("date"), // "YYYY-MM-DD" for one-time events
+    reminders: text("reminders"), // JSON array of integers e.g. "[1440,60,5]"
     ...timestamps,
   },
   (t) => [
@@ -337,3 +340,55 @@ export const familyEventsRelations = relations(familyEvents, ({ one }) => ({
     references: [families.id],
   }),
 }));
+
+// ---------------------------------------------------------------------------
+// push_tokens
+// ---------------------------------------------------------------------------
+
+export const pushTokens = pgTable(
+  "push_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    familyId: uuid("family_id")
+      .notNull()
+      .references(() => families.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("push_tokens_family_id_idx").on(t.familyId),
+    uniqueIndex("push_tokens_family_token_uniq").on(t.familyId, t.token),
+  ],
+);
+
+export const pushTokensRelations = relations(pushTokens, ({ one }) => ({
+  family: one(families, {
+    fields: [pushTokens.familyId],
+    references: [families.id],
+  }),
+}));
+
+// ---------------------------------------------------------------------------
+// sent_notifications (dedup tracking for push reminders)
+// ---------------------------------------------------------------------------
+
+export const sentNotifications = pgTable(
+  "sent_notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    familyEventId: uuid("family_event_id")
+      .notNull()
+      .references(() => familyEvents.id, { onDelete: "cascade" }),
+    reminderMinutes: integer("reminder_minutes").notNull(),
+    eventDate: text("event_date").notNull(), // "YYYY-MM-DD" of the occurrence
+    sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("sent_notifications_event_idx").on(t.familyEventId),
+    uniqueIndex("sent_notifications_dedup_uniq").on(
+      t.familyEventId,
+      t.reminderMinutes,
+      t.eventDate,
+    ),
+  ],
+);

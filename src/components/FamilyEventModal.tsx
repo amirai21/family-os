@@ -4,7 +4,7 @@
  * Uses react-hook-form + zod for validation.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, TextInput, Button, SegmentedButtons } from "react-native-paper";
 import { useForm, Controller } from "react-hook-form";
@@ -24,6 +24,14 @@ import ModalWrapper from "./ModalWrapper";
 
 const timeRegex = /^\d{1,2}:\d{2}$/;
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+const REMINDER_PRESETS = [
+  { minutes: 5, label: "5 דק׳" },
+  { minutes: 15, label: "15 דק׳" },
+  { minutes: 30, label: "30 דק׳" },
+  { minutes: 60, label: "שעה" },
+  { minutes: 1440, label: "יום" },
+];
 
 const schema = z
   .object({
@@ -88,6 +96,7 @@ interface Props {
     location?: string;
     isRecurring: boolean;
     date?: string;
+    reminders?: number[];
   }) => void;
 }
 
@@ -107,6 +116,9 @@ export default function FamilyEventModal({
   const kids = useFamilyStore((s) => s.kids);
   const activeMembers = familyMembers.filter((m) => m.isActive);
   const activeKids = kids.filter((k) => k.isActive);
+
+  // Reminders state (managed outside react-hook-form for simplicity)
+  const [selectedReminders, setSelectedReminders] = useState<number[]>([]);
 
   const {
     control,
@@ -143,6 +155,7 @@ export default function FamilyEventModal({
         endTime: minutesToHHMM(editEvent.endMinutes),
         location: editEvent.location ?? "",
       });
+      setSelectedReminders(editEvent.reminders ?? []);
     } else if (visible) {
       reset({
         title: "",
@@ -155,6 +168,7 @@ export default function FamilyEventModal({
         endTime: "10:00",
         location: "",
       });
+      setSelectedReminders([]);
     }
   }, [visible, editEvent, defaultDayOfWeek, defaultDate, reset]);
 
@@ -179,6 +193,7 @@ export default function FamilyEventModal({
       location: data.location?.trim() || undefined,
       isRecurring: data.isRecurring,
       date: data.isRecurring ? undefined : data.date,
+      reminders: selectedReminders.length > 0 ? selectedReminders : undefined,
     });
     onDismiss();
   };
@@ -384,6 +399,36 @@ export default function FamilyEventModal({
           />
         )}
       />
+
+      {/* Reminders */}
+      <Text variant="labelLarge" style={styles.label}>
+        {t("eventModal.reminders")}
+      </Text>
+      <View style={styles.chipRow}>
+        {REMINDER_PRESETS.map(({ minutes, label }) => {
+          const selected = selectedReminders.includes(minutes);
+          return (
+            <Button
+              key={minutes}
+              mode={selected ? "contained" : "outlined"}
+              compact
+              onPress={() => {
+                if (selected) {
+                  setSelectedReminders((prev) =>
+                    prev.filter((m) => m !== minutes),
+                  );
+                } else if (selectedReminders.length < 3) {
+                  setSelectedReminders((prev) => [...prev, minutes]);
+                }
+              }}
+              style={styles.chip}
+              labelStyle={styles.chipLabel}
+            >
+              {label}
+            </Button>
+          );
+        })}
+      </View>
 
       {/* Actions */}
       <View style={styles.actions}>

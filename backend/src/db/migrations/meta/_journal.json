@@ -64,6 +64,13 @@
       "when": 1773020000000,
       "tag": "0008_family_events",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773110000000,
+      "tag": "0009_push_notifications",
+      "breakpoints": true
     }
   ]
 }
