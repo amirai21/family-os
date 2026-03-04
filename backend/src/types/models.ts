@@ -9,6 +9,8 @@ import type {
   projects,
   scheduleBlocks,
   familyEvents,
+  pushTokens,
+  sentNotifications,
 } from "../db/schema.js";
 
 // ---------------------------------------------------------------------------
@@ -24,6 +26,8 @@ export type Chore = InferSelectModel<typeof chores>;
 export type Project = InferSelectModel<typeof projects>;
 export type ScheduleBlock = InferSelectModel<typeof scheduleBlocks>;
 export type FamilyEvent = InferSelectModel<typeof familyEvents>;
+export type PushToken = InferSelectModel<typeof pushTokens>;
+export type SentNotification = InferSelectModel<typeof sentNotifications>;
 
 // ---------------------------------------------------------------------------
 // Insert types  (what you SEND to create a row)
@@ -38,6 +42,7 @@ export type NewChore = InferInsertModel<typeof chores>;
 export type NewProject = InferInsertModel<typeof projects>;
 export type NewScheduleBlock = InferInsertModel<typeof scheduleBlocks>;
 export type NewFamilyEvent = InferInsertModel<typeof familyEvents>;
+export type NewPushToken = InferInsertModel<typeof pushTokens>;
 
 // ---------------------------------------------------------------------------
 // Update (patch) types  (partial insert minus id, with optional fields)

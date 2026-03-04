@@ -169,6 +169,7 @@ const he = {
     date: "תאריך",
     dateRequired: "תאריך הוא שדה חובה",
     invalidDate: "תאריך לא תקין (YYYY-MM-DD)",
+    reminders: "תזכורות",
   },
 
   // ── Assignee type labels ──

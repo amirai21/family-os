@@ -22,6 +22,8 @@ import { kidsRoutes } from "./routes/kids.js";
 import { scheduleBlocksRoutes } from "./routes/scheduleBlocks.js";
 import { familyMembersRoutes } from "./routes/familyMembers.js";
 import { familyEventsRoutes } from "./routes/familyEvents.js";
+import { pushTokenRoutes } from "./routes/pushTokens.js";
+import { notificationRoutes } from "./routes/notifications.js";
 
 // ---------------------------------------------------------------------------
 // App
@@ -52,6 +54,8 @@ app.route("/v1/family/:familyId/kids", kidsRoutes);
 app.route("/v1/family/:familyId/schedule-blocks", scheduleBlocksRoutes);
 app.route("/v1/family/:familyId/members", familyMembersRoutes);
 app.route("/v1/family/:familyId/family-events", familyEventsRoutes);
+app.route("/v1/family/:familyId/push-tokens", pushTokenRoutes);
+app.route("/v1/notifications", notificationRoutes);
 
 // ---------------------------------------------------------------------------
 // Static web app (only when /public exists — i.e. Docker production image)

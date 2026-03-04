@@ -51,6 +51,7 @@ async function main() {
     "projects",
     "schedule_blocks",
     "family_events",
+    "push_tokens",
   ];
 
   for (const table of tables) {

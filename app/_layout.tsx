@@ -17,6 +17,7 @@ import { useFamilyStore } from "@src/store/useFamilyStore";
 import { useAuthStore } from "@src/auth/useAuthStore";
 import { pullAll } from "@src/lib/sync/syncEngine";
 import { setSyncErrorHandler } from "@src/lib/sync/remoteCrud";
+import { registerForPushNotifications } from "@src/lib/notifications/registerPushToken";
 import { t } from "@src/i18n";
 
 // ── RTL bootstrap (runs once at module load, before any render) ──
@@ -85,6 +86,14 @@ export default function RootLayout() {
         console.warn("[sync] Initial pull failed:", err.message);
       });
   }, [hydrated, authStatus, authFamilyId, sessionIssuedAt]);
+
+  // Register push token once auth is complete (native only)
+  useEffect(() => {
+    if (authStatus !== "loggedIn" || !authFamilyId) return;
+    registerForPushNotifications(authFamilyId).catch((err) => {
+      console.warn("[push] Token registration failed:", err.message);
+    });
+  }, [authStatus, authFamilyId]);
 
   // Hide splash once fonts are loaded, store hydrated, and auth resolved
   const ready = fontsLoaded && hydrated && authStatus !== "booting";

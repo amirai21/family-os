@@ -439,6 +439,7 @@ export function addFamilyEventRemote(input: {
   color?: string;
   isRecurring?: boolean;
   date?: string;
+  reminders?: number[];
 }) {
   const item = useFamilyStore.getState().addFamilyEvent(input);
   fireAndForget(
@@ -454,7 +455,7 @@ export function updateFamilyEventRemote(
   patch: Partial<
     Pick<
       FamilyEvent,
-      "title" | "assigneeType" | "assigneeId" | "dayOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date"
+      "title" | "assigneeType" | "assigneeId" | "dayOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
     >
   >,
 ) {

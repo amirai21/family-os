@@ -114,13 +114,14 @@ interface FamilyState {
     color?: string;
     isRecurring?: boolean;
     date?: string;
+    reminders?: number[];
   }) => FamilyEvent;
   updateFamilyEvent: (
     id: string,
     patch: Partial<
       Pick<
         FamilyEvent,
-        "title" | "assigneeType" | "assigneeId" | "dayOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date"
+        "title" | "assigneeType" | "assigneeId" | "dayOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
       >
     >
   ) => void;
@@ -468,7 +469,7 @@ export const useFamilyStore = create<FamilyState>()(
     }),
     {
       name: "family-os-store-v2",
-      version: 7,
+      version: 8,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         familyName: state.familyName,
@@ -529,6 +530,13 @@ export const useFamilyStore = create<FamilyState>()(
         if (version < 7) {
           // Add familyName string
           persisted.familyName = persisted.familyName ?? "";
+        }
+        if (version < 8) {
+          // Add reminders to familyEvents
+          persisted.familyEvents = (persisted.familyEvents ?? []).map((e: any) => ({
+            ...e,
+            reminders: e.reminders ?? undefined,
+          }));
         }
         return persisted;
       },
