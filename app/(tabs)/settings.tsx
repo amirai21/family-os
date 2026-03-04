@@ -419,8 +419,8 @@ const styles = StyleSheet.create({
   archivedHeader: { color: "#8E8BA8", textAlign: "right" },
   nameInput: { textAlign: "right", writingDirection: "rtl", backgroundColor: "#FFFFFF" },
   accountInfo: { marginBottom: 12 },
-  accountText: { textAlign: "right", color: "#1A1A2E", marginBottom: 4 },
-  familyIdText: { textAlign: "right", color: "#8E8BA8", fontSize: 11 },
+  accountText: { textAlign: "right", writingDirection: "rtl", color: "#1A1A2E", marginBottom: 4 },
+  familyIdText: { textAlign: "right", writingDirection: "rtl", color: "#8E8BA8", fontSize: 11 },
   familyIdDebug: { textAlign: "right", color: "#B0AEC8", fontSize: 10, marginTop: 6, fontFamily: "monospace" },
   logoutBtn: { borderColor: "#FF6B6B44", borderRadius: 12 },
 });
