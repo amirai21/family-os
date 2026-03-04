@@ -283,11 +283,11 @@ const styles = StyleSheet.create({
   eventTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   eventTitle: { fontWeight: "600", color: "#1A1A2E", textAlign: "right" },
   eventTime: { color: "#6B6B8D", marginTop: 2, textAlign: "right" },
-  assigneeChip: { borderRadius: 10, height: 24, marginEnd: 4 },
+  assigneeChip: { borderRadius: 10, height: 24, marginStart: 8, marginEnd: 4 },
   oneTimeBadge: {
     fontSize: 9,
     color: "#FFA726",
