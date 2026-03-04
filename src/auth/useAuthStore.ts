@@ -9,6 +9,8 @@
 import { create } from "zustand";
 import type { AuthSession, RegisterInput, LoginInput } from "./types";
 import { authService } from "./DummyAuthService";
+import { familyApi } from "@src/lib/api/endpoints";
+import { ApiError } from "@src/lib/api/http";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import {
   clearFamilyCache,
@@ -38,6 +40,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const session = await authService.getSession();
       if (session) {
+        // Validate the family still exists in the DB.
+        // Only invalidate on a definitive 404/500 — NOT on network errors
+        // (so the app still works offline with cached data).
+        try {
+          await familyApi.get(session.user.familyId);
+        } catch (err) {
+          if (err instanceof ApiError) {
+            // Server responded but family doesn't exist → stale session
+            console.warn("[auth] Stale session — family not found, logging out");
+            await authService.logout();
+            resetFamilyData();
+            set({ session: null, status: "loggedOut", error: undefined });
+            return;
+          }
+          // Network error / timeout → keep session, let sync handle it later
+          console.warn("[auth] Could not validate family (offline?), keeping session");
+        }
         set({ session, status: "loggedIn", error: undefined });
       } else {
         set({ session: null, status: "loggedOut", error: undefined });

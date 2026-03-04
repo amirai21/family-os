@@ -17,9 +17,6 @@ import { useFamilyStore } from "@src/store/useFamilyStore";
 import { useAuthStore } from "@src/auth/useAuthStore";
 import { pullAll } from "@src/lib/sync/syncEngine";
 import { setSyncErrorHandler } from "@src/lib/sync/remoteCrud";
-import { seedScheduleIfEmpty } from "@src/store/scheduleSeed";
-import { seedFamilyMembersIfEmpty } from "@src/store/familyMemberSeed";
-import { seedKidsIfEmpty } from "@src/store/kidSeed";
 import { t } from "@src/i18n";
 
 // ── RTL bootstrap (runs once at module load, before any render) ──
@@ -83,10 +80,6 @@ export default function RootLayout() {
     pullAll(authFamilyId)
       .then(() => {
         console.log("[sync] Pull succeeded");
-        // Only seed AFTER a successful pull — prevents duplicate seeding on failure
-        seedFamilyMembersIfEmpty();
-        seedKidsIfEmpty();
-        seedScheduleIfEmpty();
       })
       .catch((err) => {
         console.warn("[sync] Initial pull failed:", err.message);
