@@ -17,6 +17,7 @@ import { hhmmToMinutes, minutesToHHMM } from "@src/utils/time";
 import { dayOfWeekFromYMD, toYMD } from "@src/utils/date";
 import { t, dayNameShort, assigneeTypeLabel } from "@src/i18n";
 import ModalWrapper from "./ModalWrapper";
+import WheelTimePicker from "./WheelTimePicker";
 
 // ---------------------------------------------------------------------------
 // Zod schema
@@ -347,19 +348,9 @@ export default function FamilyEventModal({
             control={control}
             name="endTime"
             render={({ field: { onChange, value } }) => (
-              <TextInput
-                value={value}
-                onChangeText={onChange}
-                mode="outlined"
-                style={styles.rtlInput}
-                placeholder="10:00"
-                error={!!errors.endTime}
-              />
+              <WheelTimePicker value={value} onChange={onChange} />
             )}
           />
-          {errors.endTime && (
-            <Text style={styles.error}>{errors.endTime.message}</Text>
-          )}
         </View>
         <View style={styles.timeCol}>
           <Text variant="labelLarge" style={styles.label}>
@@ -369,21 +360,14 @@ export default function FamilyEventModal({
             control={control}
             name="startTime"
             render={({ field: { onChange, value } }) => (
-              <TextInput
-                value={value}
-                onChangeText={onChange}
-                mode="outlined"
-                style={styles.rtlInput}
-                placeholder="08:00"
-                error={!!errors.startTime}
-              />
+              <WheelTimePicker value={value} onChange={onChange} />
             )}
           />
-          {errors.startTime && (
-            <Text style={styles.error}>{errors.startTime.message}</Text>
-          )}
         </View>
       </View>
+      {errors.endTime && (
+        <Text style={styles.error}>{errors.endTime.message}</Text>
+      )}
 
       {/* Location */}
       <Controller
