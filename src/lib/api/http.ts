@@ -1,6 +1,11 @@
 /**
  * http.ts — Thin fetch wrapper with base URL, timeout, typed JSON.
+ *
+ * Automatically injects Authorization: Bearer <jwt> from the stored
+ * session for all requests except /v1/auth/* endpoints.
  */
+
+import { loadSession } from "@src/auth/storage";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 
@@ -23,14 +28,28 @@ async function request<T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
+  // Build headers — inject auth token for non-auth endpoints
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string>),
+  };
+
+  if (!path.startsWith("/v1/auth/")) {
+    try {
+      const session = await loadSession();
+      if (session?.token) {
+        headers["Authorization"] = `Bearer ${session.token}`;
+      }
+    } catch {
+      // Session load failed — proceed without token
+    }
+  }
+
   try {
     const res = await fetch(`${BASE_URL}${path}`, {
       ...init,
       signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...init?.headers,
-      },
+      headers,
     });
 
     if (!res.ok) {

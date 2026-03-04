@@ -11,6 +11,7 @@ import type {
   familyEvents,
   pushTokens,
   sentNotifications,
+  users,
 } from "../db/schema.js";
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ export type ScheduleBlock = InferSelectModel<typeof scheduleBlocks>;
 export type FamilyEvent = InferSelectModel<typeof familyEvents>;
 export type PushToken = InferSelectModel<typeof pushTokens>;
 export type SentNotification = InferSelectModel<typeof sentNotifications>;
+export type User = InferSelectModel<typeof users>;
 
 // ---------------------------------------------------------------------------
 // Insert types  (what you SEND to create a row)
@@ -43,6 +45,7 @@ export type NewProject = InferInsertModel<typeof projects>;
 export type NewScheduleBlock = InferInsertModel<typeof scheduleBlocks>;
 export type NewFamilyEvent = InferInsertModel<typeof familyEvents>;
 export type NewPushToken = InferInsertModel<typeof pushTokens>;
+export type NewUser = InferInsertModel<typeof users>;
 
 // ---------------------------------------------------------------------------
 // Update (patch) types  (partial insert minus id, with optional fields)

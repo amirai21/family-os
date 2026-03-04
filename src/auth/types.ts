@@ -1,8 +1,8 @@
 /**
  * auth/types.ts — Data models for the auth layer.
  *
- * Kept backend-agnostic so DummyAuthService can be swapped for
- * ApiAuthService without touching consumers.
+ * Kept backend-agnostic so the auth service can be swapped
+ * without touching consumers.
  */
 
 export type AuthUser = {

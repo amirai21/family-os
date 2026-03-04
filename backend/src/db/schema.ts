@@ -369,6 +369,34 @@ export const pushTokensRelations = relations(pushTokens, ({ one }) => ({
 }));
 
 // ---------------------------------------------------------------------------
+// users (authentication)
+// ---------------------------------------------------------------------------
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    username: text("username").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    familyId: uuid("family_id")
+      .notNull()
+      .references(() => families.id, { onDelete: "cascade" }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("users_username_uniq").on(t.username),
+    index("users_family_id_idx").on(t.familyId),
+  ],
+);
+
+export const usersRelations = relations(users, ({ one }) => ({
+  family: one(families, {
+    fields: [users.familyId],
+    references: [families.id],
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // sent_notifications (dedup tracking for push reminders)
 // ---------------------------------------------------------------------------
 
