@@ -250,6 +250,8 @@ export const scheduleBlocks = pgTable(
     endMinutes: integer("end_minutes").notNull(),
     location: text("location"),
     color: text("color"),
+    date: text("date"), // "YYYY-MM-DD" for one-time events, null for recurring
+    isRecurring: boolean("is_recurring").default(true).notNull(),
     ...timestamps,
   },
   (t) => [

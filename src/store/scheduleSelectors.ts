@@ -10,13 +10,13 @@ import { useMemo } from "react";
 import { useFamilyStore } from "./useFamilyStore";
 import type { ScheduleBlock } from "@src/models/schedule";
 
-/** All blocks for a specific kid, sorted by dayOfWeek then startMinutes. */
+/** All recurring blocks for a specific kid, sorted by dayOfWeek then startMinutes. */
 export function useKidBlocks(kidId: string): ScheduleBlock[] {
   const blocks = useFamilyStore((s) => s.scheduleBlocks);
   return useMemo(
     () =>
       blocks
-        .filter((b) => b.kidId === kidId)
+        .filter((b) => b.kidId === kidId && b.isRecurring)
         .sort(
           (a, b) =>
             a.dayOfWeek - b.dayOfWeek || a.startMinutes - b.startMinutes,
@@ -25,7 +25,7 @@ export function useKidBlocks(kidId: string): ScheduleBlock[] {
   );
 }
 
-/** Blocks for a specific kid on a specific day of week, sorted by start time. */
+/** Recurring blocks for a specific kid on a specific day of week, sorted by start time. */
 export function useKidBlocksForDay(
   kidId: string,
   dayOfWeek: number,
@@ -34,8 +34,44 @@ export function useKidBlocksForDay(
   return useMemo(
     () =>
       blocks
-        .filter((b) => b.kidId === kidId && b.dayOfWeek === dayOfWeek)
+        .filter((b) => b.kidId === kidId && b.isRecurring && b.dayOfWeek === dayOfWeek)
         .sort((a, b) => a.startMinutes - b.startMinutes),
     [blocks, kidId, dayOfWeek],
+  );
+}
+
+/**
+ * Blocks for a specific kid on a specific date.
+ * Returns both recurring blocks for that date's DOW and one-time events on that exact date.
+ */
+export function useKidBlocksForDate(
+  kidId: string,
+  dateStr: string,
+  dayOfWeek: number,
+): ScheduleBlock[] {
+  const blocks = useFamilyStore((s) => s.scheduleBlocks);
+  return useMemo(
+    () =>
+      blocks
+        .filter(
+          (b) =>
+            b.kidId === kidId &&
+            ((b.isRecurring && b.dayOfWeek === dayOfWeek) ||
+              (!b.isRecurring && b.date === dateStr)),
+        )
+        .sort((a, b) => a.startMinutes - b.startMinutes),
+    [blocks, kidId, dateStr, dayOfWeek],
+  );
+}
+
+/** All one-time events for a specific kid. */
+export function useKidOneTimeBlocks(kidId: string): ScheduleBlock[] {
+  const blocks = useFamilyStore((s) => s.scheduleBlocks);
+  return useMemo(
+    () =>
+      blocks
+        .filter((b) => b.kidId === kidId && !b.isRecurring)
+        .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || a.startMinutes - b.startMinutes),
+    [blocks, kidId],
   );
 }

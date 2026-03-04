@@ -12,9 +12,8 @@ interface Props {
 }
 
 export default function ChoreAddModal({ visible, onDismiss }: Props) {
-  const activeMembers = useFamilyStore((s) =>
-    s.familyMembers.filter((m) => m.isActive),
-  );
+  const familyMembers = useFamilyStore((s) => s.familyMembers);
+  const activeMembers = familyMembers.filter((m) => m.isActive);
   const [title, setTitle] = useState("");
   const [assignedToMemberId, setAssignedToMemberId] = useState<
     string | undefined

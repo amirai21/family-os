@@ -10,6 +10,8 @@ export interface ScheduleBlock {
   endMinutes: number;
   location?: string;
   color?: string; // falls back to kid color if absent
+  isRecurring: boolean; // true = weekly recurring, false = one-time event
+  date?: string; // "YYYY-MM-DD" for one-time events only
   createdAt: number;
   updatedAt: number;
 }

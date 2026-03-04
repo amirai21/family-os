@@ -11,7 +11,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import type { Kid } from "@src/models/kid";
 import { useFamilyStore } from "@src/store/useFamilyStore";
-import { useKidBlocksForDay } from "@src/store/scheduleSelectors";
+import { useKidBlocksForDate } from "@src/store/scheduleSelectors";
+import { toYMD } from "@src/utils/date";
 import { syncAll } from "@src/lib/sync/syncEngine";
 import { toggleChoreDoneRemote } from "@src/lib/sync/remoteCrud";
 import { useState } from "react";
@@ -30,6 +31,7 @@ const TYPE_COLORS: Record<BlockType, string> = {
 };
 
 const todayDow = new Date().getDay();
+const todayDate = toYMD(new Date());
 
 // ---------------------------------------------------------------------------
 // KidTodayCard — shows a single kid's today schedule
@@ -37,7 +39,7 @@ const todayDow = new Date().getDay();
 
 function KidTodayCard({ kid }: { kid: Kid }) {
   const router = useRouter();
-  const blocks = useKidBlocksForDay(kid.id, todayDow);
+  const blocks = useKidBlocksForDate(kid.id, todayDate, todayDow);
 
   return (
     <Card style={[styles.kidCard, { borderColor: kid.color + "44" }]} mode="elevated">

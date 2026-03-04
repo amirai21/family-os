@@ -171,6 +171,8 @@ export function apiToLocalScheduleBlock(a: ApiScheduleBlock): ScheduleBlock {
     endMinutes: a.endMinutes,
     location: a.location ?? undefined,
     color: a.color ?? undefined,
+    isRecurring: a.isRecurring,
+    date: a.date ?? undefined,
     updatedAt: toMs(a.updatedAt),
     createdAt: toMs(a.createdAt),
   };
@@ -187,6 +189,8 @@ export function localToApiScheduleBlock(item: ScheduleBlock) {
     endMinutes: item.endMinutes,
     location: item.location ?? null,
     color: item.color ?? null,
+    isRecurring: item.isRecurring,
+    date: item.date ?? null,
   };
 }
 

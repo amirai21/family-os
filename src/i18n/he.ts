@@ -85,6 +85,7 @@ const he = {
     nothingScheduled: "אין תכנון ליום {{day}}.",
     noBlocks: "אין בלוקים",
     kidSchedule: "המערכת של {{name}}",
+    oneTimeEvent: "חד פעמי",
   },
 
   // ── Grocery Add Modal ──
@@ -136,6 +137,11 @@ const he = {
     useHHMM: "השתמשו בפורמט HH:MM",
     invalidTime: "שעה לא תקינה",
     endAfterStart: "הסיום חייב להיות אחרי ההתחלה",
+    recurring: "קבוע",
+    oneTime: "חד פעמי",
+    date: "תאריך",
+    dateRequired: "תאריך הוא שדה חובה",
+    invalidDate: "תאריך לא תקין (YYYY-MM-DD)",
   },
 
   // ── Project status labels ──

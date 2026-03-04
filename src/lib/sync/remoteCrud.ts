@@ -256,6 +256,8 @@ export function addScheduleBlockRemote(input: {
   endMinutes: number;
   location?: string;
   color?: string;
+  isRecurring?: boolean;
+  date?: string;
 }) {
   const block = useFamilyStore.getState().addScheduleBlock(input);
   fireAndForget(
@@ -271,7 +273,7 @@ export function updateScheduleBlockRemote(
   patch: Partial<
     Pick<
       ScheduleBlock,
-      "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color"
+      "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date"
     >
   >,
 ) {
