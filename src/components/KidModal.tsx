@@ -17,20 +17,21 @@ const COLOR_SWATCHES = [
   "#6C63FF", // purple
   "#FFA726", // orange
   "#AB47BC", // violet
-  "#26A69A", // green
   "#42A5F5", // blue
-  "#EF5350", // red
   "#EC407A", // pink
   "#66BB6A", // emerald
-  "#8D6E63", // brown
   "#78909C", // slate
   "#FFCA28", // gold
-  "#29B6F6", // sky blue
+  "#7E57C2", // deep purple
+  "#26C6DA", // cyan
+  "#5C6BC0", // indigo
+  "#00897B", // dark teal
 ];
 
 const EMOJI_OPTIONS = [
-  "🌸", "🚀", "⭐", "🦄", "🎨", "⚽", "🎵", "🐱",
-  "🦋", "🐶", "🌈", "🍀",
+  "🧸", "🦄", "🌸", "🐰", "🐣", "🌈", "🦋", "🐱",
+  "🐶", "🐻", "🍭", "⭐", "🎀", "🐠", "🦊", "🐝",
+  "🌻", "🍓", "👸", "🧚", "💃", "🤴", "🦸‍♂️", "🏎️",
 ];
 
 // ── Component ──
