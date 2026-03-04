@@ -117,24 +117,24 @@ export default function WheelTimePicker({
       {/* Highlight band — sits behind the center row */}
       <View style={styles.highlightBand} pointerEvents="none" />
 
-      {/* Separator (colon) */}
-      <Text style={styles.separator}>:</Text>
-
-      {/* Minutes column (right side in RTL) */}
-      <WheelColumn
-        ref={minuteRef}
-        data={minutes}
-        initialIndex={minuteIndex}
-        onScrollEnd={onMinuteScroll}
-        formatItem={(v) => String(v).padStart(2, "0")}
-      />
-
-      {/* Hours column (left side in RTL) */}
+      {/* Hours column */}
       <WheelColumn
         ref={hourRef}
         data={HOURS}
         initialIndex={hourIndex}
         onScrollEnd={onHourScroll}
+        formatItem={(v) => String(v).padStart(2, "0")}
+      />
+
+      {/* Separator (colon) */}
+      <Text style={styles.separator}>:</Text>
+
+      {/* Minutes column */}
+      <WheelColumn
+        ref={minuteRef}
+        data={minutes}
+        initialIndex={minuteIndex}
+        onScrollEnd={onMinuteScroll}
         formatItem={(v) => String(v).padStart(2, "0")}
       />
     </View>
@@ -209,6 +209,7 @@ WheelColumn.displayName = "WheelColumn";
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
+    direction: "ltr",
     alignItems: "center",
     justifyContent: "center",
     height: PICKER_HEIGHT,

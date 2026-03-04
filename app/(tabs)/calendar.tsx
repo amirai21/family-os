@@ -11,7 +11,6 @@ import {
   Card,
   Text,
   IconButton,
-  Chip,
   FAB,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -87,24 +86,21 @@ function EventRow({
             <Text style={styles.oneTimeBadge}>{t("calendar.oneTimeEvent")}</Text>
           )}
         </View>
-        <Text variant="bodySmall" style={styles.eventTime}>
-          {minutesToHHMM(event.startMinutes)} – {minutesToHHMM(event.endMinutes)}
-          {event.location ? `  ·  ${event.location}` : ""}
-        </Text>
+        <View style={styles.eventMetaRow}>
+          <Text variant="bodySmall" style={styles.eventTime}>
+            {minutesToHHMM(event.startMinutes)} – {minutesToHHMM(event.endMinutes)}
+            {event.location ? `  ·  ${event.location}` : ""}
+          </Text>
+          <Text
+            style={[
+              styles.assigneeBadge,
+              { color: ASSIGNEE_COLORS[event.assigneeType], backgroundColor: ASSIGNEE_COLORS[event.assigneeType] + "22" },
+            ]}
+          >
+            {assigneeDisplay}
+          </Text>
+        </View>
       </View>
-      <Chip
-        compact
-        textStyle={{
-          fontSize: 10,
-          color: ASSIGNEE_COLORS[event.assigneeType],
-        }}
-        style={[
-          styles.assigneeChip,
-          { backgroundColor: ASSIGNEE_COLORS[event.assigneeType] + "22" },
-        ]}
-      >
-        {assigneeDisplay}
-      </Chip>
       <IconButton icon="trash-can-outline" size={18} onPress={onDelete} />
     </Pressable>
   );
@@ -286,8 +282,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   eventTitle: { fontWeight: "600", color: "#1A1A2E", textAlign: "right" },
-  eventTime: { color: "#6B6B8D", marginTop: 2, textAlign: "right" },
-  assigneeChip: { borderRadius: 10, height: 24, marginStart: 8, marginEnd: 4 },
+  eventMetaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
+  eventTime: { color: "#6B6B8D", textAlign: "right" },
+  assigneeBadge: {
+    fontSize: 11,
+    fontWeight: "600",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
   oneTimeBadge: {
     fontSize: 9,
     color: "#FFA726",
