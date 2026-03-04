@@ -19,7 +19,8 @@ COPY constants/ ./constants/
 # Build the static web bundle (output → dist/)
 # EXPO_PUBLIC_API_URL is empty so all API calls are relative (same-origin)
 ENV EXPO_PUBLIC_API_URL=""
-RUN npx expo export --platform web
+RUN npx expo export --platform web \
+    && sed -i 's/<script src="\/_expo/<script type="module" src="\/_expo/g' dist/index.html
 
 # =============================================================================
 # Stage 2: Install backend dependencies
