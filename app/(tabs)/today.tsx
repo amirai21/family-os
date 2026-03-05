@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import {
   Card,
   Text,
-  Checkbox,
+  IconButton,
   Button,
   ActivityIndicator,
 } from "react-native-paper";
@@ -285,9 +285,12 @@ export default function TodayScreen() {
                   : chore.assignedTo;
                 return (
                   <View key={chore.id} style={styles.choreRow}>
-                    <Checkbox
-                      status={chore.done ? "checked" : "unchecked"}
+                    <IconButton
+                      icon={chore.done ? "check-circle" : "circle-outline"}
+                      size={24}
+                      iconColor={chore.done ? "#4ECDC4" : "#C0BDD8"}
                       onPress={() => toggleChoreDoneRemote(chore.id)}
+                      style={styles.choreCheck}
                     />
                     <Pressable
                       style={styles.choreTextWrap}
@@ -517,6 +520,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 4,
   },
+  choreCheck: { margin: 0 },
   choreTextWrap: { flex: 1, marginStart: 4 },
   choreText: { textAlign: "right" },
   choreDoneText: { textDecorationLine: "line-through", color: "#8E8BA8", textAlign: "right" },
