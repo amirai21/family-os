@@ -140,13 +140,14 @@ interface FamilyState {
     color?: string;
     isRecurring?: boolean;
     date?: string;
+    reminders?: number[];
   }) => ScheduleBlock;
   updateScheduleBlock: (
     id: string,
     patch: Partial<
       Pick<
         ScheduleBlock,
-        "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date"
+        "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
       >
     >
   ) => void;

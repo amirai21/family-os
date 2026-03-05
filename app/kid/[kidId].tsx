@@ -161,6 +161,7 @@ export default function KidScheduleScreen() {
     location?: string;
     isRecurring: boolean;
     date?: string;
+    reminders?: number[];
   }) => {
     if (editingBlock) {
       updateScheduleBlockRemote(editingBlock.id, data);

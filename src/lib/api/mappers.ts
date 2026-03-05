@@ -175,6 +175,7 @@ export function apiToLocalScheduleBlock(a: ApiScheduleBlock): ScheduleBlock {
     color: a.color ?? undefined,
     isRecurring: a.isRecurring,
     date: a.date ?? undefined,
+    reminders: a.reminders ? JSON.parse(a.reminders) : undefined,
     updatedAt: toMs(a.updatedAt),
     createdAt: toMs(a.createdAt),
   };
@@ -193,6 +194,10 @@ export function localToApiScheduleBlock(item: ScheduleBlock) {
     color: item.color ?? null,
     isRecurring: item.isRecurring,
     date: item.date ?? null,
+    reminders:
+      item.reminders && item.reminders.length > 0
+        ? JSON.stringify(item.reminders)
+        : null,
   };
 }
 
