@@ -11,6 +11,7 @@ import type { ViewStyle } from "react-native";
 import { Text } from "react-native-paper";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import { t } from "@src/i18n";
+import { RTL_ROW, RTL_ALIGN_RIGHT } from "@src/ui/rtl";
 
 interface FamilyBadgeProps {
   style?: ViewStyle;
@@ -33,8 +34,8 @@ export default function FamilyBadge({ style }: FamilyBadgeProps) {
 
 const styles = StyleSheet.create({
   badge: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
+    alignSelf: RTL_ALIGN_RIGHT,
+    flexDirection: RTL_ROW,
     alignItems: "center",
     backgroundColor: "#E8E6FF",
     paddingHorizontal: 14,

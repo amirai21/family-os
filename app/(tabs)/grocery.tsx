@@ -22,6 +22,7 @@ import GroceryAddModal from "@src/components/GroceryAddModal";
 import { t, groceryCategoryLabel, shoppingCategoryLabel } from "@src/i18n";
 import type { ShoppingCategory } from "@src/models/grocery";
 import { SHOPPING_CATEGORIES } from "@src/models/grocery";
+import { RTL_ROW } from "@src/ui/rtl";
 
 const EMPTY_KEYS: Record<ShoppingCategory, string> = {
   grocery: "grocery.emptyGrocery",
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, marginStart: 4 },
   itemTitle: { textAlign: "right" },
-  meta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" },
+  meta: { flexDirection: RTL_ROW, alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" },
   chip: { backgroundColor: "#F0EEFF" },
   chipText: { fontSize: 11, lineHeight: 16 },
   qty: { color: "#6B6B8D", textAlign: "right" },
