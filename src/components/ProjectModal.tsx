@@ -43,11 +43,11 @@ function ProgressSlider({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         const ratio = (evt.nativeEvent.pageX - layoutX.current) / trackWidth.current;
-        onChangeRef.current(clamp(ratio * 100));
+        onChangeRef.current(clamp((1 - ratio) * 100));
       },
       onPanResponderMove: (evt) => {
         const ratio = (evt.nativeEvent.pageX - layoutX.current) / trackWidth.current;
-        onChangeRef.current(clamp(ratio * 100));
+        onChangeRef.current(clamp((1 - ratio) * 100));
       },
     }),
   ).current;
@@ -65,7 +65,7 @@ function ProgressSlider({
     (e: any) => {
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const x = e.clientX - rect.left;
-      onChange(clamp((x / rect.width) * 100));
+      onChange(clamp(((rect.width - x) / rect.width) * 100));
     },
     [onChange],
   );
