@@ -28,31 +28,26 @@ function ProgressSlider({
   value: number;
   onChange: (v: number) => void;
 }) {
-  const trackWidth = useRef(0);
-  const progressRef = useRef(value);
-  progressRef.current = value;
-
   const clamp = (v: number) => Math.round(Math.min(100, Math.max(0, v)));
+  const pct = Math.min(100, Math.max(0, value));
 
-  const toProgress = useCallback(
-    (pageX: number, layoutX: number) => {
-      const ratio = (pageX - layoutX) / trackWidth.current;
-      return clamp(ratio * 100);
-    },
-    [],
-  );
-
+  // ── Shared ref for native (PanResponder) path ──
+  const trackWidth = useRef(0);
   const layoutX = useRef(0);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
-        onChange(toProgress(evt.nativeEvent.pageX, layoutX.current));
+        const ratio = (evt.nativeEvent.pageX - layoutX.current) / trackWidth.current;
+        onChangeRef.current(clamp(ratio * 100));
       },
       onPanResponderMove: (evt) => {
-        onChange(toProgress(evt.nativeEvent.pageX, layoutX.current));
+        const ratio = (evt.nativeEvent.pageX - layoutX.current) / trackWidth.current;
+        onChangeRef.current(clamp(ratio * 100));
       },
     }),
   ).current;
@@ -60,13 +55,35 @@ function ProgressSlider({
   const onTrackLayout = (e: LayoutChangeEvent) => {
     trackWidth.current = e.nativeEvent.layout.width;
     layoutX.current = e.nativeEvent.layout.x;
-    // Measure absolute position for accurate pageX mapping
     (e.target as any)?.measureInWindow?.((x: number) => {
       if (x != null) layoutX.current = x;
     });
   };
 
-  const pct = Math.min(100, Math.max(0, value));
+  // ── Web pointer handler (getBoundingClientRect is reliable on web) ──
+  const handleWebPointer = useCallback(
+    (e: any) => {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      onChange(clamp((x / rect.width) * 100));
+    },
+    [onChange],
+  );
+
+  // On web: use native pointer events; on native: use PanResponder
+  const trackProps =
+    Platform.OS === "web"
+      ? {
+          onPointerDown: (e: any) => {
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            handleWebPointer(e);
+          },
+          onPointerMove: (e: any) => {
+            if (e.buttons === 0) return;
+            handleWebPointer(e);
+          },
+        }
+      : panResponder.panHandlers;
 
   return (
     <View style={styles.sliderContainer}>
@@ -80,9 +97,9 @@ function ProgressSlider({
       <View
         style={styles.sliderTrackWrap}
         onLayout={onTrackLayout}
-        {...panResponder.panHandlers}
+        {...trackProps}
       >
-        <View style={styles.sliderTrack}>
+        <View style={styles.sliderTrack} pointerEvents="none">
           <View
             style={[
               styles.sliderFill,
@@ -91,6 +108,7 @@ function ProgressSlider({
           />
         </View>
         <View
+          pointerEvents="none"
           style={[
             styles.sliderThumb,
             { left: `${pct}%`, marginLeft: -(THUMB_SIZE / 2) },
