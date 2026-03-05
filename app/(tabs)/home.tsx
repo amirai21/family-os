@@ -5,7 +5,6 @@ import {
   Text,
   IconButton,
   Checkbox,
-  Chip,
   Divider,
   ProgressBar,
 } from "react-native-paper";
@@ -336,22 +335,17 @@ export default function HomeScreen() {
                     <Text variant="bodyLarge" style={styles.projectTitle}>
                       {proj.title}
                     </Text>
-                    <Chip
-                      compact
-                      textStyle={{
-                        fontSize: 11,
-                        color: STATUS_COLORS[proj.status],
-                      }}
+                    <Text
                       style={[
-                        styles.statusChip,
+                        styles.statusBadge,
                         {
-                          backgroundColor:
-                            STATUS_COLORS[proj.status] + "22",
+                          color: STATUS_COLORS[proj.status],
+                          backgroundColor: STATUS_COLORS[proj.status] + "22",
                         },
                       ]}
                     >
                       {statusLabel(proj.status)}
-                    </Chip>
+                    </Text>
                   </View>
                   {proj.description ? (
                     <Text
@@ -425,7 +419,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, backgroundColor: "#FFFFFF", marginBottom: 20 },
   cardTitle: { fontWeight: "700", color: "#1A1A2E", flex: 1, textAlign: "right" },
   sectionHeader: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 4,
@@ -439,7 +433,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   kidCard: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -453,7 +447,7 @@ const styles = StyleSheet.create({
 
   // Notes
   noteRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -473,7 +467,7 @@ const styles = StyleSheet.create({
   },
   choreDivider: { marginVertical: 8 },
   choreRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     paddingVertical: 2,
   },
@@ -484,7 +478,7 @@ const styles = StyleSheet.create({
 
   // Projects
   projectRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "flex-start",
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -492,12 +486,19 @@ const styles = StyleSheet.create({
   },
   projectContent: { flex: 1, cursor: "pointer" } as any,
   projectTop: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     gap: 8,
   },
   projectTitle: { flex: 1, textAlign: "right" },
-  statusChip: { borderRadius: 12, height: 26 },
+  statusBadge: {
+    fontSize: 11,
+    fontWeight: "600",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
   projDesc: { color: "#6B6B8D", marginTop: 4, textAlign: "right" },
   progressBar: { height: 5, borderRadius: 3, marginTop: 8 },
   progressLabel: { color: "#8E8BA8", marginTop: 2, textAlign: "right" },
