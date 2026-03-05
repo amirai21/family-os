@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   chip: { borderRadius: 20 },
   chipLabel: { fontSize: 12 },
   segmented: { marginBottom: 10, marginTop: 4 },
-  timeRow: { flexDirection: RTL_ROW, gap: 12 },
+  timeRow: { flexDirection: RTL_ROW, gap: 12, marginBottom: 24 },
   timeCol: { flex: 1 },
   error: { color: "#FF6B6B", fontSize: 12, marginBottom: 4, marginTop: -4 },
   actions: {

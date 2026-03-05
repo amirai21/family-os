@@ -3,7 +3,7 @@
  * Uses react-hook-form + zod for validation.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, TextInput, Button, SegmentedButtons } from "react-native-paper";
 import { useForm, Controller } from "react-hook-form";
@@ -25,6 +25,14 @@ import WheelTimePicker from "./WheelTimePicker";
 
 const timeRegex = /^\d{1,2}:\d{2}$/;
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+const REMINDER_PRESETS = [
+  { minutes: 5, label: "5 דק׳" },
+  { minutes: 15, label: "15 דק׳" },
+  { minutes: 30, label: "30 דק׳" },
+  { minutes: 60, label: "שעה" },
+  { minutes: 1440, label: "יום" },
+];
 
 const schema = z
   .object({
@@ -88,6 +96,7 @@ interface Props {
     location?: string;
     isRecurring: boolean;
     date?: string;
+    reminders?: number[];
   }) => void;
 }
 
@@ -103,6 +112,8 @@ export default function ScheduleBlockModal({
   defaultDate,
   onSubmit,
 }: Props) {
+  const [selectedReminders, setSelectedReminders] = useState<number[]>([]);
+
   const {
     control,
     handleSubmit,
@@ -137,6 +148,7 @@ export default function ScheduleBlockModal({
         endTime: minutesToHHMM(editBlock.endMinutes),
         location: editBlock.location ?? "",
       });
+      setSelectedReminders(editBlock.reminders ?? []);
     } else if (visible) {
       reset({
         title: "",
@@ -148,6 +160,7 @@ export default function ScheduleBlockModal({
         endTime: "10:00",
         location: "",
       });
+      setSelectedReminders([]);
     }
   }, [visible, editBlock, defaultDayOfWeek, defaultDate, reset]);
 
@@ -169,6 +182,7 @@ export default function ScheduleBlockModal({
       location: data.location?.trim() || undefined,
       isRecurring: data.isRecurring,
       date: data.isRecurring ? undefined : data.date,
+      reminders: selectedReminders.length > 0 ? selectedReminders : undefined,
     });
     onDismiss();
   };
@@ -326,6 +340,36 @@ export default function ScheduleBlockModal({
         )}
       />
 
+      {/* Reminders */}
+      <Text variant="labelLarge" style={styles.label}>
+        {t("eventModal.reminders")}
+      </Text>
+      <View style={styles.chipRow}>
+        {REMINDER_PRESETS.map(({ minutes, label }) => {
+          const selected = selectedReminders.includes(minutes);
+          return (
+            <Button
+              key={minutes}
+              mode={selected ? "contained" : "outlined"}
+              compact
+              onPress={() => {
+                if (selected) {
+                  setSelectedReminders((prev) =>
+                    prev.filter((m) => m !== minutes),
+                  );
+                } else if (selectedReminders.length < 3) {
+                  setSelectedReminders((prev) => [...prev, minutes]);
+                }
+              }}
+              style={styles.chip}
+              labelStyle={styles.chipLabel}
+            >
+              {label}
+            </Button>
+          );
+        })}
+      </View>
+
       {/* Actions */}
       <View style={styles.actions}>
         <Button onPress={onDismiss}>{t("cancel")}</Button>
@@ -347,7 +391,7 @@ const styles = StyleSheet.create({
   chip: { borderRadius: 20 },
   chipLabel: { fontSize: 12 },
   segmented: { marginBottom: 10, marginTop: 4 },
-  timeRow: { flexDirection: RTL_ROW, gap: 12 },
+  timeRow: { flexDirection: RTL_ROW, gap: 12, marginBottom: 24 },
   timeCol: { flex: 1 },
   error: { color: "#FF6B6B", fontSize: 12, marginBottom: 4, marginTop: -4 },
   actions: {

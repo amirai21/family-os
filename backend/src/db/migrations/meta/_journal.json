@@ -78,6 +78,13 @@
       "when": 1773200000000,
       "tag": "0010_users_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773290000000,
+      "tag": "0011_schedule_block_reminders",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ export interface ScheduleBlock {
   color?: string; // falls back to kid color if absent
   isRecurring: boolean; // true = weekly recurring, false = one-time event
   date?: string; // "YYYY-MM-DD" for one-time events only
+  reminders?: number[]; // minutes before event, e.g. [1440, 60, 5]
   createdAt: number;
   updatedAt: number;
 }
