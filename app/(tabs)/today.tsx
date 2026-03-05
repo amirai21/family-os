@@ -19,6 +19,7 @@ import { syncAll } from "@src/lib/sync/syncEngine";
 import { toggleChoreDoneRemote } from "@src/lib/sync/remoteCrud";
 import { t, LOCALE, blockTypeLabel, assigneeTypeLabel } from "@src/i18n";
 import { minutesToHHMM } from "@src/utils/time";
+import { RTL_ROW } from "@src/ui/rtl";
 import type { BlockType } from "@src/models/schedule";
 import type { AssigneeType } from "@src/models/familyEvent";
 import FamilyBadge from "@src/components/FamilyBadge";
@@ -402,7 +403,7 @@ const styles = StyleSheet.create({
   // Sync card
   syncCard: { borderRadius: 16, backgroundColor: "#FFFFFF", marginTop: 16, marginBottom: 16 },
   syncContent: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     justifyContent: "space-between",
   },
@@ -431,7 +432,7 @@ const styles = StyleSheet.create({
 
   // Today's chores
   choreRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     paddingVertical: 4,
   },
@@ -455,7 +456,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   kidHeader: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -468,15 +469,16 @@ const styles = StyleSheet.create({
 
   // Block rows inside kid cards
   blockRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
-    paddingVertical: 6,
+    paddingVertical: 10,
   },
   blockStripe: {
     width: 4,
     borderRadius: 2,
     alignSelf: "stretch",
-    marginEnd: 10,
+    marginEnd: 12,
+    marginStart: 4,
   },
   blockInfo: { flex: 1 },
   blockTitle: { fontWeight: "600", color: "#1A1A2E", textAlign: "right" },

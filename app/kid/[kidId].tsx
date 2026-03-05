@@ -33,6 +33,7 @@ import type { ScheduleBlock, BlockType } from "@src/models/schedule";
 import { minutesToHHMM } from "@src/utils/time";
 import { toYMD, dayOfWeekFromYMD } from "@src/utils/date";
 import { t, dayName, blockTypeLabel } from "@src/i18n";
+import { RTL_ROW } from "@src/ui/rtl";
 
 import MonthCalendar from "@src/components/Calendar/MonthCalendar";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
@@ -335,9 +336,9 @@ const styles = StyleSheet.create({
 
   // Block row
   blockRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#F0EEFF",
   },
@@ -345,17 +346,18 @@ const styles = StyleSheet.create({
     width: 4,
     height: 36,
     borderRadius: 2,
-    marginEnd: 10,
+    marginEnd: 12,
+    marginStart: 4,
   },
   blockInfo: { flex: 1 },
   blockTitleRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     gap: 8,
   },
   blockTitle: { fontWeight: "600", color: "#1A1A2E", textAlign: "right" },
   blockTime: { color: "#6B6B8D", marginTop: 2, textAlign: "right" },
-  typeChip: { borderRadius: 10, height: 24, marginStart: 8, marginEnd: 4 },
+  typeChip: { borderRadius: 10, marginStart: 8, marginEnd: 4 },
   oneTimeBadge: {
     fontSize: 9,
     color: "#FFA726",
@@ -375,7 +377,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   templateHeader: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     justifyContent: "space-between",
   },
