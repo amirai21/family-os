@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import type { Kid } from "@src/models/kid";
 import type { Note } from "@src/models/note";
+import type { Chore } from "@src/models/chore";
 import type { ScheduleBlock, BlockType } from "@src/models/schedule";
 import type { FamilyEvent, AssigneeType } from "@src/models/familyEvent";
 import { useFamilyStore } from "@src/store/useFamilyStore";
@@ -31,6 +32,7 @@ import PinnedNotesCarousel from "@src/components/PinnedNotesCarousel";
 import NoteModal from "@src/components/NoteModal";
 import FamilyEventModal from "@src/components/FamilyEventModal";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
+import ChoreAddModal from "@src/components/ChoreAddModal";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -140,6 +142,8 @@ export default function TodayScreen() {
   const [editingEvent, setEditingEvent] = useState<FamilyEvent | null>(null);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
+  const [choreModalOpen, setChoreModalOpen] = useState(false);
+  const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const router = useRouter();
 
   const activeKids = kids.filter((k) => k.isActive);
@@ -285,7 +289,13 @@ export default function TodayScreen() {
                       status={chore.done ? "checked" : "unchecked"}
                       onPress={() => toggleChoreDoneRemote(chore.id)}
                     />
-                    <View style={styles.choreTextWrap}>
+                    <Pressable
+                      style={styles.choreTextWrap}
+                      onPress={() => {
+                        setEditingChore(chore);
+                        setChoreModalOpen(true);
+                      }}
+                    >
                       <Text
                         variant="bodyLarge"
                         style={chore.done ? styles.choreDoneText : styles.choreText}
@@ -297,7 +307,7 @@ export default function TodayScreen() {
                           {assigneeDisplay}
                         </Text>
                       ) : null}
-                    </View>
+                    </Pressable>
                   </View>
                 );
               })
@@ -452,6 +462,15 @@ export default function TodayScreen() {
             updateScheduleBlockRemote(editingBlock.id, data);
           }
         }}
+      />
+
+      <ChoreAddModal
+        visible={choreModalOpen}
+        onDismiss={() => {
+          setChoreModalOpen(false);
+          setEditingChore(null);
+        }}
+        editChore={editingChore}
       />
     </SafeAreaView>
   );
