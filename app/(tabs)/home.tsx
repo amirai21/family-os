@@ -30,6 +30,7 @@ import ProjectModal from "@src/components/ProjectModal";
 import KidModal from "@src/components/KidModal";
 import { t, statusLabel } from "@src/i18n";
 import FamilyBadge from "@src/components/FamilyBadge";
+import { RTL_ROW } from "@src/ui/rtl";
 
 const STATUS_COLORS: Record<string, string> = {
   idea: "#8E8BA8",
@@ -433,7 +434,7 @@ const styles = StyleSheet.create({
 
   // Kids
   kidsRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     flexWrap: "wrap",
     gap: 10,
   },

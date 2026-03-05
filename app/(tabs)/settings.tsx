@@ -14,6 +14,7 @@ import KidModal from "@src/components/KidModal";
 import type { FamilyMember } from "@src/models/familyMember";
 import type { Kid } from "@src/models/kid";
 import { t, memberRoleLabel } from "@src/i18n";
+import { RTL_ROW } from "@src/ui/rtl";
 
 // ── Member row ──
 
@@ -382,7 +383,7 @@ const styles = StyleSheet.create({
   },
   card: { borderRadius: 16, backgroundColor: "#FFFFFF", marginBottom: 24 },
   sectionHeader: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
@@ -392,7 +393,7 @@ const styles = StyleSheet.create({
   subtitle: { color: "#8E8BA8", textAlign: "right", marginTop: 2 },
   emptyText: { color: "#6B6B8D", textAlign: "right", marginVertical: 8 },
   memberRow: {
-    flexDirection: "row",
+    flexDirection: RTL_ROW,
     alignItems: "center",
     paddingVertical: 8,
   },
