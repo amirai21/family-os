@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo, useLayoutEffect } from "react";
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Platform } from "react-native";
 import {
   Text,
   Card,
@@ -61,7 +61,13 @@ function BlockRow({
 }) {
   const color = block.color ?? kidColor;
   return (
-    <Pressable style={styles.blockRow} onPress={onEdit}>
+    <Pressable
+      style={({ hovered }: any) => [
+        styles.blockRow,
+        hovered && styles.blockRowHover,
+      ]}
+      onPress={onEdit}
+    >
       <View style={[styles.blockStripe, { backgroundColor: color }]} />
       <View style={styles.blockInfo}>
         <View style={styles.blockTitleRow}>
@@ -260,16 +266,22 @@ export default function KidScheduleScreen() {
             <>
               {Array.from({ length: 7 }, (_, dow) => (
                 <View key={dow} style={styles.templateDay}>
-                  <View style={styles.templateHeader}>
+                  <Pressable
+                    style={({ hovered }: any) => [
+                      styles.templateHeader,
+                      hovered && styles.templateHeaderHover,
+                    ]}
+                    onPress={() => openAdd(dow)}
+                  >
                     <Text variant="titleSmall" style={styles.templateDayName}>
                       {dayName(dow)}
                     </Text>
                     <IconButton
                       icon="plus"
                       size={18}
-                      onPress={() => openAdd(dow)}
+                      pointerEvents="none"
                     />
-                  </View>
+                  </Pressable>
 
                   {blocksByDay[dow].length === 0 ? (
                     <Text variant="bodySmall" style={styles.emptyText}>
@@ -341,6 +353,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#F0EEFF",
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
+  },
+  blockRowHover: {
+    backgroundColor: "#E8F5E9",
   },
   blockStripe: {
     width: 4,
@@ -380,6 +398,12 @@ const styles = StyleSheet.create({
     flexDirection: RTL_ROW,
     alignItems: "center",
     justifyContent: "space-between",
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
+  },
+  templateHeaderHover: {
+    backgroundColor: "#F0EEFF",
   },
   templateDayName: { fontWeight: "700", color: "#1A1A2E", textAlign: "right" },
 
