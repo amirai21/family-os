@@ -47,10 +47,12 @@ export default function CustomTabBar({
     <View style={styles.bar}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
+        // Skip routes not in the main tab set (e.g. kid/[kidId])
+        if (!(route.name in TAB_COLORS)) return null;
         const label = options.title ?? route.name;
         const isFocused = state.index === index;
         const name = route.name;
-        const palette = TAB_COLORS[name] ?? TAB_COLORS.settings;
+        const palette = TAB_COLORS[name];
         const iconName = TAB_ICONS[name] ?? "ellipse";
 
         const onPress = () => {
