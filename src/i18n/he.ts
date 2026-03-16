@@ -190,6 +190,8 @@ const he = {
     eventsForDate: "אירועים ליום {{day}}",
     noEvents: "אין אירועים ליום זה",
     oneTimeEvent: "חד פעמי",
+    monthView: "חודש",
+    weekView: "שבוע",
   },
 
   // ── Project status labels ──

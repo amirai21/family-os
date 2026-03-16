@@ -12,6 +12,7 @@ import {
   Text,
   IconButton,
   FAB,
+  SegmentedButtons,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -41,6 +42,7 @@ import { t, dayName, assigneeTypeLabel, blockTypeLabel } from "@src/i18n";
 import { RTL_ROW } from "@src/ui/rtl";
 
 import MonthCalendar from "@src/components/Calendar/MonthCalendar";
+import WeekCalendar from "@src/components/Calendar/WeekCalendar";
 import FamilyEventModal from "@src/components/FamilyEventModal";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
 import FamilyBadge from "@src/components/FamilyBadge";
@@ -180,7 +182,10 @@ function KidBlockRow({
 // Screen
 // ---------------------------------------------------------------------------
 
+type CalendarView = "month" | "week";
+
 export default function CalendarScreen() {
+  const [calendarView, setCalendarView] = useState<CalendarView>("month");
   const [selectedDate, setSelectedDate] = useState(toYMD(new Date()));
   const selectedDow = dayOfWeekFromYMD(selectedDate);
   const dayEvents = useFamilyEventsForDate(selectedDate, selectedDow);
@@ -272,15 +277,35 @@ export default function CalendarScreen() {
         </Text>
         <FamilyBadge />
 
+        {/* Month / Week toggle */}
+        <SegmentedButtons
+          value={calendarView}
+          onValueChange={(v) => setCalendarView(v as CalendarView)}
+          buttons={[
+            { value: "month", label: t("calendar.monthView") },
+            { value: "week", label: t("calendar.weekView") },
+          ]}
+          style={styles.viewToggle}
+        />
+
         {/* Calendar */}
         <Card style={styles.card} mode="elevated">
           <Card.Content>
-            <MonthCalendar
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-              markedDates={markedDates}
-              accentColor={ACCENT_COLOR}
-            />
+            {calendarView === "month" ? (
+              <MonthCalendar
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                markedDates={markedDates}
+                accentColor={ACCENT_COLOR}
+              />
+            ) : (
+              <WeekCalendar
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                markedDates={markedDates}
+                accentColor={ACCENT_COLOR}
+              />
+            )}
           </Card.Content>
         </Card>
 
@@ -366,6 +391,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
+  viewToggle: { marginBottom: 12 },
   card: { borderRadius: 16, backgroundColor: "#FFFFFF", marginBottom: 16 },
   sectionTitle: {
     fontWeight: "700",
