@@ -61,7 +61,7 @@ const DEFAULT_ACCENT = "#6C63FF";
 const FAMILY_COLOR = "#4ECDC4";
 const KID_COLOR = "#FF6B6B";
 const MEMBER_COLOR = "#6C63FF";
-const MAX_EVENTS = 3;
+const MAX_EVENTS = 5;
 
 const DAY_LABELS = he.calendarDays; // ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"] Sun–Sat
 
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
 
   dayCol: {
     flex: 1,
-    minHeight: 130,
+    minHeight: 170,
     paddingHorizontal: 2,
     paddingBottom: 8,
     borderRadius: 8,
