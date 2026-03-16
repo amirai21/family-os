@@ -27,6 +27,8 @@ import NoteModal from "@src/components/NoteModal";
 import ChoreAddModal from "@src/components/ChoreAddModal";
 import ProjectModal from "@src/components/ProjectModal";
 import KidModal from "@src/components/KidModal";
+import ConfirmDeleteModal from "@src/components/ConfirmDeleteModal";
+import { useConfirmDelete } from "@src/hooks/useConfirmDelete";
 import { t, statusLabel } from "@src/i18n";
 import FamilyBadge from "@src/components/FamilyBadge";
 import { RTL_ROW } from "@src/ui/rtl";
@@ -41,7 +43,7 @@ const STATUS_COLORS: Record<string, string> = {
 // ChoreRow — reusable row for both sections
 // ---------------------------------------------------------------------------
 
-function ChoreRow({ chore, onEdit }: { chore: Chore; onEdit: () => void }) {
+function ChoreRow({ chore, onEdit, onDelete }: { chore: Chore; onEdit: () => void; onDelete: () => void }) {
   const assignedMember = useFamilyStore((s) =>
     chore.assignedToMemberId
       ? s.familyMembers.find((m) => m.id === chore.assignedToMemberId)
@@ -84,7 +86,7 @@ function ChoreRow({ chore, onEdit }: { chore: Chore; onEdit: () => void }) {
       <IconButton
         icon="trash-can-outline"
         size={18}
-        onPress={() => deleteChoreRemote(chore.id)}
+        onPress={onDelete}
       />
     </View>
   );
@@ -96,6 +98,7 @@ function ChoreRow({ chore, onEdit }: { chore: Chore; onEdit: () => void }) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { confirmVisible, requestDelete, confirmDelete, dismissConfirm } = useConfirmDelete();
 
   // Store
   const notes = useFamilyStore((s) => s.notes);
@@ -222,7 +225,7 @@ export default function HomeScreen() {
                 <IconButton
                   icon="trash-can-outline"
                   size={18}
-                  onPress={() => deleteNoteRemote(note.id)}
+                  onPress={() => requestDelete(() => deleteNoteRemote(note.id))}
                 />
               </View>
             ))}
@@ -266,6 +269,7 @@ export default function HomeScreen() {
                       setEditingChore(chore);
                       setChoreModalOpen(true);
                     }}
+                    onDelete={() => requestDelete(() => deleteChoreRemote(chore.id))}
                   />
                 ))}
               </>
@@ -292,6 +296,7 @@ export default function HomeScreen() {
                       setEditingChore(chore);
                       setChoreModalOpen(true);
                     }}
+                    onDelete={() => requestDelete(() => deleteChoreRemote(chore.id))}
                   />
                 ))}
               </>
@@ -368,7 +373,7 @@ export default function HomeScreen() {
                 <IconButton
                   icon="trash-can-outline"
                   size={18}
-                  onPress={() => deleteProjectRemote(proj.id)}
+                  onPress={() => requestDelete(() => deleteProjectRemote(proj.id))}
                 />
               </View>
             ))}
@@ -407,6 +412,11 @@ export default function HomeScreen() {
           setEditingKid(null);
         }}
         editKid={editingKid}
+      />
+      <ConfirmDeleteModal
+        visible={confirmVisible}
+        onConfirm={confirmDelete}
+        onDismiss={dismissConfirm}
       />
     </SafeAreaView>
   );

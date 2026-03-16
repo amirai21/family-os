@@ -184,6 +184,14 @@ const he = {
     kid: "ילד/ה",
   } as Record<string, string>,
 
+  // ── Confirm-delete dialog ──
+  confirmDelete: {
+    title: "מחיקה",
+    message: "האם אתה בטוח? פעולה זו לא ניתנת לביטול.",
+    confirm: "מחק",
+    cancel: "ביטול",
+  },
+
   // ── Calendar screen ──
   calendar: {
     title: "לוח שנה",

@@ -37,6 +37,8 @@ import { RTL_ROW } from "@src/ui/rtl";
 
 import MonthCalendar from "@src/components/Calendar/MonthCalendar";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
+import ConfirmDeleteModal from "@src/components/ConfirmDeleteModal";
+import { useConfirmDelete } from "@src/hooks/useConfirmDelete";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -141,6 +143,8 @@ export default function KidScheduleScreen() {
 
   // One-time events for calendar dots
   const oneTimeBlocks = useKidOneTimeBlocks(kidId!);
+
+  const { confirmVisible, requestDelete, confirmDelete, dismissConfirm } = useConfirmDelete();
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
@@ -252,7 +256,7 @@ export default function KidScheduleScreen() {
                         block={b}
                         kidColor={kidColor}
                         onEdit={() => openEdit(b)}
-                        onDelete={() => deleteScheduleBlockRemote(b.id)}
+                        onDelete={() => requestDelete(() => deleteScheduleBlockRemote(b.id))}
                       />
                     ))}
                   </Card.Content>
@@ -294,7 +298,7 @@ export default function KidScheduleScreen() {
                         block={b}
                         kidColor={kidColor}
                         onEdit={() => openEdit(b)}
-                        onDelete={() => deleteScheduleBlockRemote(b.id)}
+                        onDelete={() => requestDelete(() => deleteScheduleBlockRemote(b.id))}
                       />
                     ))
                   )}
@@ -322,6 +326,11 @@ export default function KidScheduleScreen() {
           defaultDayOfWeek={modalDay}
           defaultDate={tab === "calendar" ? selectedDate : undefined}
           onSubmit={handleSubmit}
+        />
+        <ConfirmDeleteModal
+          visible={confirmVisible}
+          onConfirm={confirmDelete}
+          onDismiss={dismissConfirm}
         />
     </SafeAreaView>
   );
