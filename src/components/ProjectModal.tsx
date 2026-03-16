@@ -31,8 +31,27 @@ function ProgressSlider({
   const clamp = (v: number) => Math.round(Math.min(100, Math.max(0, v)));
   const pct = Math.min(100, Math.max(0, value));
 
-  // ── Shared ref for native (PanResponder) path ──
-  const trackWidth = useRef(0);
+  // Width of the wrapper (measured via onLayout)
+  const [wrapperW, setWrapperW] = useState(0);
+  // Usable range for thumb center (track has THUMB_SIZE/2 margin each side)
+  const usable = Math.max(0, wrapperW - THUMB_SIZE);
+
+  // ── Thumb left in pixels ──
+  // On iOS RTL: `left` is auto-mirrored to `right`, so left:0 = right edge.
+  //   0% progress → right edge → left: 0
+  //   100% progress → left edge → left: usable
+  //   General: left = (pct/100) * usable
+  // On web: `left` is NOT mirrored. In RTL context:
+  //   0% progress → right edge → left: usable
+  //   100% progress → left edge → left: 0
+  //   General: left = (1 - pct/100) * usable
+  const thumbLeft =
+    Platform.OS === "web"
+      ? (1 - pct / 100) * usable
+      : (pct / 100) * usable;
+
+  // ── Shared refs for native (PanResponder) path ──
+  const wrapperWRef = useRef(0);
   const layoutX = useRef(0);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -42,18 +61,21 @@ function ProgressSlider({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
-        const ratio = (evt.nativeEvent.pageX - layoutX.current) / trackWidth.current;
+        // In RTL: left edge = 100%, right edge = 0%
+        const ratio = (evt.nativeEvent.pageX - layoutX.current) / wrapperWRef.current;
         onChangeRef.current(clamp((1 - ratio) * 100));
       },
       onPanResponderMove: (evt) => {
-        const ratio = (evt.nativeEvent.pageX - layoutX.current) / trackWidth.current;
+        const ratio = (evt.nativeEvent.pageX - layoutX.current) / wrapperWRef.current;
         onChangeRef.current(clamp((1 - ratio) * 100));
       },
     }),
   ).current;
 
   const onTrackLayout = (e: LayoutChangeEvent) => {
-    trackWidth.current = e.nativeEvent.layout.width;
+    const w = e.nativeEvent.layout.width;
+    wrapperWRef.current = w;
+    setWrapperW(w);
     layoutX.current = e.nativeEvent.layout.x;
     (e.target as any)?.measureInWindow?.((x: number) => {
       if (x != null) layoutX.current = x;
@@ -65,6 +87,7 @@ function ProgressSlider({
     (e: any) => {
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const x = e.clientX - rect.left;
+      // In RTL: left edge = 100%, right edge = 0%
       onChange(clamp(((rect.width - x) / rect.width) * 100));
     },
     [onChange],
@@ -107,16 +130,12 @@ function ProgressSlider({
             ]}
           />
         </View>
-        <View
-          pointerEvents="none"
-          style={[
-            styles.sliderThumb,
-            {
-              left: `${Platform.OS === "web" ? 100 - pct : pct}%`,
-              marginLeft: -(THUMB_SIZE / 2),
-            },
-          ]}
-        />
+        {wrapperW > 0 && (
+          <View
+            pointerEvents="none"
+            style={[styles.sliderThumb, { left: thumbLeft }]}
+          />
+        )}
       </View>
     </View>
   );
@@ -266,7 +285,7 @@ const styles = StyleSheet.create({
   statusLabel: { fontSize: 12 },
 
   // Slider
-  sliderContainer: { marginBottom: 16, direction: "ltr", overflow: "visible" },
+  sliderContainer: { marginBottom: 16 },
   sliderLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -279,8 +298,6 @@ const styles = StyleSheet.create({
     height: THUMB_SIZE + 8,
     justifyContent: "center",
     position: "relative",
-    overflow: "visible",
-    paddingHorizontal: THUMB_SIZE / 2,
     ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
   },
   sliderTrack: {
@@ -288,6 +305,7 @@ const styles = StyleSheet.create({
     borderRadius: TRACK_HEIGHT / 2,
     backgroundColor: "#E8E6FF",
     overflow: "hidden",
+    marginHorizontal: THUMB_SIZE / 2,
   },
   sliderFill: {
     height: TRACK_HEIGHT,
