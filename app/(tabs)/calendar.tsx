@@ -46,6 +46,8 @@ import WeekCalendar from "@src/components/Calendar/WeekCalendar";
 import FamilyEventModal from "@src/components/FamilyEventModal";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
 import FamilyBadge from "@src/components/FamilyBadge";
+import ConfirmDeleteModal from "@src/components/ConfirmDeleteModal";
+import { useConfirmDelete } from "@src/hooks/useConfirmDelete";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -198,6 +200,8 @@ export default function CalendarScreen() {
   const kidRecurringByDay = useAllKidRecurringByDay();
   const kidOneTimeBlocks = useAllKidOneTimeBlocks();
 
+  const { confirmVisible, requestDelete, confirmDelete, dismissConfirm } = useConfirmDelete();
+
   // Modal state — family events
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<FamilyEvent | null>(null);
@@ -326,7 +330,7 @@ export default function CalendarScreen() {
                   key={event.id}
                   event={event}
                   onEdit={() => openEdit(event)}
-                  onDelete={() => deleteFamilyEventRemote(event.id)}
+                  onDelete={() => requestDelete(() => deleteFamilyEventRemote(event.id))}
                 />
               ))}
               {dayBlocks.map((block) => (
@@ -334,7 +338,7 @@ export default function CalendarScreen() {
                   key={block.id}
                   block={block}
                   onEdit={() => openEditBlock(block)}
-                  onDelete={() => deleteScheduleBlockRemote(block.id)}
+                  onDelete={() => requestDelete(() => deleteScheduleBlockRemote(block.id))}
                 />
               ))}
             </Card.Content>
@@ -376,6 +380,11 @@ export default function CalendarScreen() {
             updateScheduleBlockRemote(editingBlock.id, data);
           }
         }}
+      />
+      <ConfirmDeleteModal
+        visible={confirmVisible}
+        onConfirm={confirmDelete}
+        onDismiss={dismissConfirm}
       />
     </SafeAreaView>
   );
