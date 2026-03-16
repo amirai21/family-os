@@ -17,7 +17,7 @@ import {
   ScrollView,
   Platform,
 } from "react-native";
-import { Text, ProgressBar, IconButton } from "react-native-paper";
+import { Text, ProgressBar } from "react-native-paper";
 import type { Project } from "@src/models/project";
 import { t, statusLabel } from "@src/i18n";
 import { RTL_ROW } from "@src/ui/rtl";
@@ -108,24 +108,16 @@ export default function ActiveProjectsCarousel({
         <AddCard cardWidth={CARD_W} onPress={onAddPress} />
       </ScrollView>
 
-      {/* Web-only prev/next arrows */}
-      {Platform.OS === "web" && (
-        <View style={styles.arrowOverlay} pointerEvents="box-none">
-          {/* Right arrow = go to previous card (RTL: first cards are on the right) */}
-          <IconButton
-            icon="chevron-right"
-            size={22}
-            onPress={goPrev}
-            style={[styles.arrowBtn, currentIndex <= 0 && styles.arrowHidden]}
-          />
-          {/* Left arrow = go to next card */}
-          <IconButton
-            icon="chevron-left"
-            size={22}
-            onPress={goNext}
-            style={[styles.arrowBtn, currentIndex >= total - 1 && styles.arrowHidden]}
-          />
-        </View>
+      {/* Web-only prev/next arrows — individually positioned, no overlay */}
+      {Platform.OS === "web" && currentIndex > 0 && (
+        <Pressable style={[styles.arrowBtn, styles.arrowRight]} onPress={goPrev}>
+          <Text style={styles.arrowText}>›</Text>
+        </Pressable>
+      )}
+      {Platform.OS === "web" && currentIndex < total - 1 && (
+        <Pressable style={[styles.arrowBtn, styles.arrowLeft]} onPress={goNext}>
+          <Text style={styles.arrowText}>‹</Text>
+        </Pressable>
       )}
     </View>
   );
@@ -223,31 +215,32 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
 
-  // Web-only arrow overlay
-  arrowOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 0,
-  },
+  // Web-only arrow buttons
   arrowBtn: {
-    backgroundColor: "rgba(255,255,255,0.90)",
-    borderRadius: 20,
+    position: "absolute",
+    top: 37, // (minHeight 110 - button 36) / 2
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
   },
-  arrowHidden: {
-    opacity: 0,
-    pointerEvents: "none",
-  } as any,
+  arrowLeft: { left: 4 },
+  arrowRight: { right: 4 },
+  arrowText: {
+    fontSize: 22,
+    color: "#6C63FF",
+    fontWeight: "600",
+    textAlign: "center",
+    lineHeight: 28,
+  },
 
   // Project card
   projectCard: {
