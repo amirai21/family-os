@@ -7,7 +7,7 @@
  * Follows the same pattern as PinnedNotesCarousel.
  */
 
-import React, { useRef } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -17,7 +17,7 @@ import {
   ScrollView,
   Platform,
 } from "react-native";
-import { Text, ProgressBar } from "react-native-paper";
+import { Text, ProgressBar, IconButton } from "react-native-paper";
 import type { Project } from "@src/models/project";
 import { t, statusLabel } from "@src/i18n";
 import { RTL_ROW } from "@src/ui/rtl";
@@ -60,6 +60,27 @@ export default function ActiveProjectsCarousel({
   const sideInset = (screenWidth - CARD_W) / 2;
   const scrollRef = useRef<ScrollView>(null);
 
+  // Web-only arrow navigation
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const total = projects.length + 1; // +1 for the Add card
+
+  const goNext = useCallback(() => {
+    const next = Math.min(currentIndex + 1, total - 1);
+    setCurrentIndex(next);
+    scrollRef.current?.scrollTo({ x: next * SNAP_INTERVAL, animated: true });
+  }, [currentIndex, total, SNAP_INTERVAL]);
+
+  const goPrev = useCallback(() => {
+    const prev = Math.max(currentIndex - 1, 0);
+    setCurrentIndex(prev);
+    scrollRef.current?.scrollTo({ x: prev * SNAP_INTERVAL, animated: true });
+  }, [currentIndex, SNAP_INTERVAL]);
+
+  const handleScrollEnd = useCallback((e: any) => {
+    const offset = e.nativeEvent.contentOffset.x;
+    setCurrentIndex(Math.round(offset / SNAP_INTERVAL));
+  }, [SNAP_INTERVAL]);
+
   return (
     <View style={styles.wrapper}>
       <ScrollView
@@ -71,6 +92,7 @@ export default function ActiveProjectsCarousel({
         contentContainerStyle={{
           paddingHorizontal: sideInset - GAP / 2,
         }}
+        onMomentumScrollEnd={handleScrollEnd}
         // Flip scroll direction for RTL on web
         style={I18nManager.isRTL && Platform.OS === "web" ? { direction: "rtl" } : undefined}
       >
@@ -85,6 +107,26 @@ export default function ActiveProjectsCarousel({
         {/* Add card */}
         <AddCard cardWidth={CARD_W} onPress={onAddPress} />
       </ScrollView>
+
+      {/* Web-only prev/next arrows */}
+      {Platform.OS === "web" && (
+        <View style={styles.arrowOverlay} pointerEvents="box-none">
+          {/* Right arrow = go to previous card (RTL: first cards are on the right) */}
+          <IconButton
+            icon="chevron-right"
+            size={22}
+            onPress={goPrev}
+            style={[styles.arrowBtn, currentIndex <= 0 && styles.arrowHidden]}
+          />
+          {/* Left arrow = go to next card */}
+          <IconButton
+            icon="chevron-left"
+            size={22}
+            onPress={goNext}
+            style={[styles.arrowBtn, currentIndex >= total - 1 && styles.arrowHidden]}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -180,6 +222,32 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     overflow: "visible",
   },
+
+  // Web-only arrow overlay
+  arrowOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 0,
+  },
+  arrowBtn: {
+    backgroundColor: "rgba(255,255,255,0.90)",
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  arrowHidden: {
+    opacity: 0,
+    pointerEvents: "none",
+  } as any,
 
   // Project card
   projectCard: {
