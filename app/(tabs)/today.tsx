@@ -28,9 +28,12 @@ import {
 import { t, LOCALE, blockTypeLabel, assigneeTypeLabel } from "@src/i18n";
 import { minutesToHHMM } from "@src/utils/time";
 import { RTL_ROW } from "@src/ui/rtl";
+import { C, S, R } from "@src/ui/tokens";
 import FamilyBadge from "@src/components/FamilyBadge";
 import PinnedNotesCarousel from "@src/components/PinnedNotesCarousel";
 import ActiveProjectsCarousel from "@src/components/ActiveProjectsCarousel";
+import SummaryCard from "@src/components/SummaryCard";
+import SectionHeader from "@src/components/SectionHeader";
 import NoteModal from "@src/components/NoteModal";
 import FamilyEventModal from "@src/components/FamilyEventModal";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
@@ -42,22 +45,22 @@ import ProjectModal from "@src/components/ProjectModal";
 // ---------------------------------------------------------------------------
 
 const TYPE_COLORS: Record<BlockType, string> = {
-  school: "#6C63FF",
-  hobby: "#FF6B6B",
-  other: "#4ECDC4",
+  school: C.purple,
+  hobby: C.red,
+  other: C.teal,
 };
 
 const ASSIGNEE_COLORS: Record<AssigneeType, string> = {
-  family: "#4ECDC4",
-  member: "#6C63FF",
-  kid: "#FF6B6B",
+  family: C.teal,
+  member: C.purple,
+  kid: C.red,
 };
 
 const todayDow = new Date().getDay();
 const todayDate = toYMD(new Date());
 
 // ---------------------------------------------------------------------------
-// KidTodayCard — shows a single kid's today schedule
+// KidTodayCard
 // ---------------------------------------------------------------------------
 
 function KidTodayCard({
@@ -71,15 +74,15 @@ function KidTodayCard({
   const blocks = useKidBlocksForDate(kid.id, todayDate, todayDow);
 
   return (
-    <Card style={[styles.kidCard, { borderColor: kid.color + "44" }]} mode="elevated">
+    <Card
+      style={[styles.kidCard, { borderTopColor: kid.color }]}
+      mode="elevated"
+    >
       <Pressable onPress={() => router.push(`/kid/${kid.id}`)}>
-        <View style={[styles.kidHeader, { backgroundColor: kid.color + "18" }]}>
+        <View style={styles.kidHeader}>
           <Text style={styles.kidEmoji}>{kid.emoji}</Text>
           <View style={styles.kidEmojiSpacer} />
-          <Text
-            variant="titleMedium"
-            style={[styles.kidName, { color: kid.color }]}
-          >
+          <Text style={[styles.kidName, { color: kid.color }]}>
             {kid.name}
           </Text>
           <Text style={[styles.kidArrow, { color: kid.color }]}>‹</Text>
@@ -88,29 +91,33 @@ function KidTodayCard({
 
       <View style={styles.kidBody}>
         {blocks.length === 0 ? (
-          <Text variant="bodySmall" style={styles.noSchedule}>
-            {t("today.noSchedule")}
-          </Text>
+          <Text style={styles.noSchedule}>{t("today.noSchedule")}</Text>
         ) : (
           blocks.map((block) => {
             const color = block.color ?? kid.color;
             const typeColor = TYPE_COLORS[block.type];
             return (
-              <Pressable key={block.id} style={({ hovered }: any) => [styles.blockRow, hovered && styles.blockRowHover]} onPress={() => onBlockPress(block)}>
+              <Pressable
+                key={block.id}
+                style={({ hovered }: any) => [
+                  styles.blockRow,
+                  hovered && styles.blockRowHover,
+                ]}
+                onPress={() => onBlockPress(block)}
+              >
                 <View style={[styles.blockStripe, { backgroundColor: color }]} />
                 <View style={styles.blockInfo}>
-                  <Text variant="bodyMedium" style={styles.blockTitle}>
-                    {block.title}
-                  </Text>
-                  <Text variant="bodySmall" style={styles.blockTime}>
-                    {minutesToHHMM(block.startMinutes)} – {minutesToHHMM(block.endMinutes)}
+                  <Text style={styles.blockTitle}>{block.title}</Text>
+                  <Text style={styles.blockTime}>
+                    {minutesToHHMM(block.startMinutes)} –{" "}
+                    {minutesToHHMM(block.endMinutes)}
                     {block.location ? `  ·  ${block.location}` : ""}
                   </Text>
                 </View>
                 <Text
                   style={[
-                    styles.blockType,
-                    { color: typeColor, backgroundColor: typeColor + "22" },
+                    styles.typeBadge,
+                    { color: typeColor, backgroundColor: typeColor + "18" },
                   ]}
                 >
                   {blockTypeLabel(block.type)}
@@ -192,60 +199,46 @@ export default function TodayScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text variant="headlineLarge" style={styles.title}>
-          {t("today.title")}
-        </Text>
+        <Text style={styles.title}>{t("today.title")}</Text>
         <FamilyBadge />
 
-        {/* Overview */}
-        <Card style={styles.card} mode="elevated">
-          <Card.Content>
-            <Text variant="titleMedium" style={styles.cardTitle}>
-              {t("today.overview")}
-            </Text>
-            <View style={styles.statsGrid}>
-              <Pressable
-                style={[styles.stat, { backgroundColor: "#FFE0E0" }]}
-                onPress={() => router.push("/(tabs)/grocery")}
-              >
-                <Text style={[styles.statNum, { color: "#FF6B6B" }]}>
-                  {unboughtCount}
-                </Text>
-                <Text style={styles.statLabel}>{t("today.groceryItems")}</Text>
-              </Pressable>
-              <View style={[styles.stat, { backgroundColor: "#D4F5F2" }]}>
-                <Text style={[styles.statNum, { color: "#4ECDC4" }]}>
-                  {undoneChores}
-                </Text>
-                <Text style={styles.statLabel}>{t("today.choresToDo")}</Text>
-              </View>
-              <Pressable
-                style={[styles.stat, { backgroundColor: "#E8E6FF" }]}
-                onPress={() => setProjectsCarouselOpen((v) => !v)}
-              >
-                <Text style={[styles.statNum, { color: "#6C63FF" }]}>
-                  {inProgressProjects}
-                </Text>
-                <Text style={styles.statLabel}>
-                  {t("today.activeProjects")} {projectsCarouselOpen ? "\u25B2" : "\u25BC"}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.stat, { backgroundColor: "#FFF3E0" }]}
-                onPress={() => setCarouselOpen((v) => !v)}
-              >
-                <Text style={[styles.statNum, { color: "#FFA726" }]}>
-                  {pinnedNotes}
-                </Text>
-                <Text style={styles.statLabel}>
-                  {t("today.pinnedNotes")} {carouselOpen ? "▲" : "▼"}
-                </Text>
-              </Pressable>
-            </View>
-          </Card.Content>
+        {/* ── Overview stats ── */}
+        <Card style={styles.overviewCard} mode="elevated">
+          <View style={styles.statsRow}>
+            <SummaryCard
+              value={unboughtCount}
+              label={t("today.groceryItems")}
+              accentColor={C.red}
+              onPress={() => router.push("/(tabs)/grocery")}
+            />
+            <View style={styles.dividerV} />
+            <SummaryCard
+              value={undoneChores}
+              label={t("today.choresToDo")}
+              accentColor={C.teal}
+            />
+          </View>
+          <View style={styles.dividerH} />
+          <View style={styles.statsRow}>
+            <SummaryCard
+              value={inProgressProjects}
+              label={t("today.activeProjects")}
+              accentColor={C.purple}
+              onPress={() => setProjectsCarouselOpen((v) => !v)}
+              expanded={projectsCarouselOpen}
+            />
+            <View style={styles.dividerV} />
+            <SummaryCard
+              value={pinnedNotes}
+              label={t("today.pinnedNotes")}
+              accentColor={C.amber}
+              onPress={() => setCarouselOpen((v) => !v)}
+              expanded={carouselOpen}
+            />
+          </View>
         </Card>
 
-        {/* Pinned notes carousel */}
+        {/* ── Pinned notes carousel ── */}
         {carouselOpen && pinnedNotesList.length > 0 && (
           <PinnedNotesCarousel
             notes={pinnedNotesList}
@@ -260,11 +253,9 @@ export default function TodayScreen() {
           />
         )}
         {carouselOpen && pinnedNotesList.length === 0 && (
-          <Card style={styles.card} mode="elevated">
-            <Card.Content style={styles.emptyCarousel}>
-              <Text variant="bodyMedium" style={styles.emptyCarouselText}>
-                {t("home.noNotes")}
-              </Text>
+          <Card style={styles.emptyCard} mode="elevated">
+            <Card.Content style={styles.emptyContent}>
+              <Text style={styles.emptyText}>{t("home.noNotes")}</Text>
               <Button
                 mode="contained"
                 compact
@@ -272,7 +263,7 @@ export default function TodayScreen() {
                   setEditingNote(null);
                   setNoteModalOpen(true);
                 }}
-                style={styles.emptyCarouselBtn}
+                style={[styles.emptyBtn, { backgroundColor: C.amber }]}
               >
                 {t("today.addNote")}
               </Button>
@@ -280,7 +271,7 @@ export default function TodayScreen() {
           </Card>
         )}
 
-        {/* Active projects carousel */}
+        {/* ── Active projects carousel ── */}
         {projectsCarouselOpen && activeProjectsList.length > 0 && (
           <ActiveProjectsCarousel
             projects={activeProjectsList}
@@ -295,11 +286,9 @@ export default function TodayScreen() {
           />
         )}
         {projectsCarouselOpen && activeProjectsList.length === 0 && (
-          <Card style={styles.card} mode="elevated">
-            <Card.Content style={styles.emptyCarousel}>
-              <Text variant="bodyMedium" style={styles.emptyCarouselText}>
-                {t("today.noActiveProjects")}
-              </Text>
+          <Card style={styles.emptyCard} mode="elevated">
+            <Card.Content style={styles.emptyContent}>
+              <Text style={styles.emptyText}>{t("today.noActiveProjects")}</Text>
               <Button
                 mode="contained"
                 compact
@@ -307,7 +296,7 @@ export default function TodayScreen() {
                   setEditingProject(null);
                   setProjectModalOpen(true);
                 }}
-                style={styles.emptyCarouselBtnPurple}
+                style={[styles.emptyBtn, { backgroundColor: C.purple }]}
               >
                 {t("today.addProject")}
               </Button>
@@ -315,14 +304,12 @@ export default function TodayScreen() {
           </Card>
         )}
 
-        {/* Today's chores */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          {t("today.todayChores")}
-        </Text>
+        {/* ── Today's chores ── */}
+        <SectionHeader label={t("today.todayChores")} />
         <Card style={styles.card} mode="elevated">
           <Card.Content>
             {todayChores.length === 0 ? (
-              <Text variant="bodyMedium" style={styles.choreEmpty}>
+              <Text style={styles.emptyRowText}>
                 {t("today.noChoresForToday")}
               </Text>
             ) : (
@@ -336,16 +323,21 @@ export default function TodayScreen() {
                 return (
                   <View
                     key={chore.id}
-                    style={[styles.choreRow, hoveredChoreId === chore.id && styles.choreRowHover]}
-                    {...(Platform.OS === "web" ? {
-                      onPointerEnter: () => setHoveredChoreId(chore.id),
-                      onPointerLeave: () => setHoveredChoreId(null),
-                    } : {} as any)}
+                    style={[
+                      styles.choreRow,
+                      hoveredChoreId === chore.id && styles.rowHover,
+                    ]}
+                    {...(Platform.OS === "web"
+                      ? {
+                          onPointerEnter: () => setHoveredChoreId(chore.id),
+                          onPointerLeave: () => setHoveredChoreId(null),
+                        }
+                      : ({} as any))}
                   >
                     <IconButton
                       icon={chore.done ? "check-circle" : "circle-outline"}
-                      size={24}
-                      iconColor={chore.done ? "#4ECDC4" : "#C0BDD8"}
+                      size={22}
+                      iconColor={chore.done ? C.teal : C.textMuted}
                       onPress={() => toggleChoreDoneRemote(chore.id)}
                       style={styles.choreCheck}
                     />
@@ -357,13 +349,14 @@ export default function TodayScreen() {
                       }}
                     >
                       <Text
-                        variant="bodyLarge"
-                        style={chore.done ? styles.choreDoneText : styles.choreText}
+                        style={
+                          chore.done ? styles.choreDone : styles.choreTitle
+                        }
                       >
                         {chore.title}
                       </Text>
                       {assigneeDisplay ? (
-                        <Text variant="bodySmall" style={styles.choreAssignee}>
+                        <Text style={styles.choreAssignee}>
                           {assigneeDisplay}
                         </Text>
                       ) : null}
@@ -375,26 +368,30 @@ export default function TodayScreen() {
           </Card.Content>
         </Card>
 
-        {/* Family Events for today */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          {t("today.familyEvents")}
-        </Text>
+        {/* ── Family events ── */}
+        <SectionHeader label={t("today.familyEvents")} />
         <Card style={styles.card} mode="elevated">
           <Card.Content>
             {todayEvents.length === 0 ? (
-              <Text variant="bodyMedium" style={styles.choreEmpty}>
+              <Text style={styles.emptyRowText}>
                 {t("today.noEventsForToday")}
               </Text>
             ) : (
               todayEvents.map((event) => {
-                const color = event.color ?? ASSIGNEE_COLORS[event.assigneeType];
+                const color =
+                  event.color ?? ASSIGNEE_COLORS[event.assigneeType];
                 let assigneeDisplay = t("today.wholeFamily");
                 if (event.assigneeType === "member" && event.assigneeId) {
-                  const member = familyMembers.find((m) => m.id === event.assigneeId);
+                  const member = familyMembers.find(
+                    (m) => m.id === event.assigneeId,
+                  );
                   assigneeDisplay = member
                     ? `${member.avatarEmoji ?? ""} ${member.name}`
                     : assigneeTypeLabel("member");
-                } else if (event.assigneeType === "kid" && event.assigneeId) {
+                } else if (
+                  event.assigneeType === "kid" &&
+                  event.assigneeId
+                ) {
                   const kid = kids.find((k) => k.id === event.assigneeId);
                   assigneeDisplay = kid
                     ? `${kid.emoji}  ${kid.name}`
@@ -403,28 +400,33 @@ export default function TodayScreen() {
                 return (
                   <Pressable
                     key={event.id}
-                    style={({ hovered }: any) => [styles.blockRow, hovered && styles.blockRowHover]}
+                    style={({ hovered }: any) => [
+                      styles.blockRow,
+                      hovered && styles.blockRowHover,
+                    ]}
                     onPress={() => {
                       setEditingEvent(event);
                       setEventModalOpen(true);
                     }}
                   >
-                    <View style={[styles.blockStripe, { backgroundColor: color }]} />
+                    <View
+                      style={[styles.blockStripe, { backgroundColor: color }]}
+                    />
                     <View style={styles.blockInfo}>
-                      <Text variant="bodyMedium" style={styles.blockTitle}>
-                        {event.title}
-                      </Text>
-                      <Text variant="bodySmall" style={styles.blockTime}>
-                        {minutesToHHMM(event.startMinutes)} – {minutesToHHMM(event.endMinutes)}
+                      <Text style={styles.blockTitle}>{event.title}</Text>
+                      <Text style={styles.blockTime}>
+                        {minutesToHHMM(event.startMinutes)} –{" "}
+                        {minutesToHHMM(event.endMinutes)}
                         {event.location ? `  ·  ${event.location}` : ""}
                       </Text>
                     </View>
                     <Text
                       style={[
-                        styles.blockType,
+                        styles.typeBadge,
                         {
                           color: ASSIGNEE_COLORS[event.assigneeType],
-                          backgroundColor: ASSIGNEE_COLORS[event.assigneeType] + "22",
+                          backgroundColor:
+                            ASSIGNEE_COLORS[event.assigneeType] + "18",
                         },
                       ]}
                     >
@@ -437,10 +439,8 @@ export default function TodayScreen() {
           </Card.Content>
         </Card>
 
-        {/* Kids — per-kid today schedule */}
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          {t("today.kids")}
-        </Text>
+        {/* ── Kids ── */}
+        <SectionHeader label={t("today.kids")} />
         {activeKids.map((kid) => (
           <KidTodayCard
             key={kid.id}
@@ -452,35 +452,28 @@ export default function TodayScreen() {
           />
         ))}
 
-        {/* Sync card */}
-        <Card style={styles.syncCard} mode="elevated">
-          <Card.Content style={styles.syncContent}>
-            <View style={styles.syncLeft}>
-              <Text variant="titleSmall" style={styles.syncTitle}>
-                {t("today.sync")}
-              </Text>
-              <Text variant="bodySmall" style={styles.syncMeta}>
-                {syncStatus === "syncing"
-                  ? t("today.syncing")
-                  : syncStatus === "error"
-                  ? t("today.syncError")
-                  : t("today.lastSync", { time: formatLastSync() })}
-              </Text>
-            </View>
-            {syncing ? (
-              <ActivityIndicator size="small" />
-            ) : (
-              <Button
-                mode="outlined"
-                compact
-                onPress={handleSync}
-                style={styles.syncBtn}
-              >
-                {t("today.syncNow")}
-              </Button>
-            )}
-          </Card.Content>
-        </Card>
+        {/* ── Sync ── */}
+        <View style={styles.syncRow}>
+          <Text style={styles.syncMeta}>
+            {syncStatus === "syncing"
+              ? t("today.syncing")
+              : syncStatus === "error"
+              ? t("today.syncError")
+              : t("today.lastSync", { time: formatLastSync() })}
+          </Text>
+          {syncing ? (
+            <ActivityIndicator size="small" color={C.textMuted} />
+          ) : (
+            <Button
+              mode="text"
+              compact
+              onPress={handleSync}
+              textColor={C.textSecondary}
+            >
+              {t("today.syncNow")}
+            </Button>
+          )}
+        </View>
       </ScrollView>
 
       <NoteModal
@@ -545,115 +538,187 @@ export default function TodayScreen() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FAFAFE" },
-  container: { padding: 20, paddingBottom: 40 },
-  title: { fontWeight: "800", color: "#1A1A2E", marginBottom: 20, textAlign: "right" },
+  safe: { flex: 1, backgroundColor: C.bg },
+  container: { padding: S.lg, paddingBottom: S.xxl + S.lg },
 
-  // Sync card
-  syncCard: { borderRadius: 16, backgroundColor: "#FFFFFF", marginTop: 16, marginBottom: 16 },
-  syncContent: {
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: C.textPrimary,
+    marginBottom: S.lg,
+    textAlign: "right",
+  },
+
+  // ── Overview card ──────────────────────────────────────────────────────────
+  overviewCard: {
+    borderRadius: R.lg,
+    backgroundColor: C.surface,
+    marginBottom: S.xl,
+    overflow: "hidden",
+  },
+  statsRow: {
     flexDirection: RTL_ROW,
-    alignItems: "center",
-    justifyContent: "space-between",
   },
-  syncLeft: { flex: 1 },
-  syncTitle: { fontWeight: "700", color: "#1A1A2E", textAlign: "right" },
-  syncMeta: { color: "#6B6B8D", marginTop: 2, textAlign: "right" },
-  syncBtn: { borderRadius: 12, marginStart: 12 },
+  dividerV: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: C.border,
+  },
+  dividerH: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: C.border,
+  },
 
-  card: { borderRadius: 16, backgroundColor: "#FFFFFF", marginBottom: 24 },
-  cardTitle: { fontWeight: "700", color: "#1A1A2E", marginBottom: 12, textAlign: "right" },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+  // ── Shared card ───────────────────────────────────────────────────────────
+  card: {
+    borderRadius: R.lg,
+    backgroundColor: C.surface,
+    marginBottom: S.lg,
   },
-  stat: {
-    flex: 1,
-    minWidth: "45%",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-  },
-  statNum: { fontSize: 28, fontWeight: "800", textAlign: "center" },
-  statLabel: { fontSize: 12, color: "#6B6B8D", marginTop: 2, textAlign: "center" },
-  sectionTitle: { fontWeight: "700", color: "#1A1A2E", marginBottom: 12, textAlign: "right" },
 
-  // Today's chores
+  // ── Empty states ──────────────────────────────────────────────────────────
+  emptyCard: {
+    borderRadius: R.lg,
+    backgroundColor: C.surface,
+    marginBottom: S.lg,
+  },
+  emptyContent: { alignItems: "center", paddingVertical: S.lg },
+  emptyText: {
+    color: C.textMuted,
+    textAlign: "center",
+    marginBottom: S.md,
+    fontSize: 14,
+  },
+  emptyBtn: { borderRadius: R.md },
+  emptyRowText: {
+    color: C.textMuted,
+    textAlign: "right",
+    fontSize: 14,
+    paddingVertical: S.xs,
+  },
+
+  // ── Chore rows ─────────────────────────────────────────────────────────────
   choreRow: {
     flexDirection: RTL_ROW,
     alignItems: "center",
-    paddingVertical: 4,
-    borderRadius: 8,
-    paddingHorizontal: 4,
+    paddingVertical: S.xs,
+    borderRadius: R.sm,
+    paddingHorizontal: S.xs,
   },
-  choreRowHover: {
-    backgroundColor: "#DBEAFE",
-  },
+  rowHover: { backgroundColor: C.hoverBg },
   choreCheck: { margin: 0 },
-  choreTextWrap: { flex: 1, marginStart: 4 },
-  choreText: { textAlign: "right" },
-  choreDoneText: { textDecorationLine: "line-through", color: "#8E8BA8", textAlign: "right" },
-  choreAssignee: { color: "#6B6B8D", textAlign: "right" },
-  choreEmpty: { color: "#8E8BA8", textAlign: "right" },
+  choreTextWrap: { flex: 1, marginStart: S.xs },
+  choreTitle: {
+    fontSize: 15,
+    color: C.textPrimary,
+    textAlign: "right",
+  },
+  choreDone: {
+    fontSize: 15,
+    textDecorationLine: "line-through",
+    color: C.textMuted,
+    textAlign: "right",
+  },
+  choreAssignee: {
+    fontSize: 12,
+    color: C.textSecondary,
+    textAlign: "right",
+    marginTop: 1,
+  },
 
-  // Pinned notes carousel empty
-  emptyCarousel: { alignItems: "center", paddingVertical: 16 },
-  emptyCarouselText: { color: "#8E8BA8", textAlign: "center", marginBottom: 12 },
-  emptyCarouselBtn: { borderRadius: 12, backgroundColor: "#FFA726" },
-  emptyCarouselBtnPurple: { borderRadius: 12, backgroundColor: "#6C63FF" },
+  // ── Block / event rows ────────────────────────────────────────────────────
+  blockRow: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    paddingVertical: S.md,
+    borderRadius: R.sm,
+    paddingHorizontal: S.xs,
+    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
+  },
+  blockRowHover: { backgroundColor: C.hoverBg },
+  blockStripe: {
+    width: 3,
+    borderRadius: 2,
+    alignSelf: "stretch",
+    marginEnd: S.md,
+    marginStart: S.xs,
+  },
+  blockInfo: { flex: 1 },
+  blockTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.textPrimary,
+    textAlign: "right",
+  },
+  blockTime: {
+    fontSize: 12,
+    color: C.textSecondary,
+    marginTop: 2,
+    textAlign: "right",
+  },
+  typeBadge: {
+    fontSize: 10,
+    fontWeight: "600",
+    paddingHorizontal: S.sm,
+    paddingVertical: 3,
+    borderRadius: R.sm,
+    overflow: "hidden",
+    marginStart: S.sm,
+  },
 
-  // Kid today cards
+  // ── Kid cards ─────────────────────────────────────────────────────────────
   kidCard: {
-    borderRadius: 16,
-    backgroundColor: "#FFFFFF",
-    marginBottom: 14,
-    borderWidth: 1,
+    borderRadius: R.lg,
+    backgroundColor: C.surface,
+    marginBottom: S.md,
+    borderTopWidth: 2,
     overflow: "hidden",
   },
   kidHeader: {
     flexDirection: RTL_ROW,
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: S.lg,
+    paddingVertical: S.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
   },
-  kidEmoji: { fontSize: 22 },
-  kidEmojiSpacer: { width: 5 },
-  kidName: { flex: 1, fontWeight: "700", textAlign: "right" },
-  kidArrow: { fontSize: 20, fontWeight: "700" },
-  kidBody: { paddingHorizontal: 16, paddingBottom: 14 },
-  noSchedule: { color: "#8E8BA8", textAlign: "right", paddingVertical: 4 },
+  kidEmoji: { fontSize: 20 },
+  kidEmojiSpacer: { width: S.sm },
+  kidName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  kidArrow: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: C.textMuted,
+  },
+  kidBody: { paddingHorizontal: S.lg, paddingBottom: S.md },
+  noSchedule: {
+    color: C.textMuted,
+    textAlign: "right",
+    paddingVertical: S.sm,
+    fontSize: 13,
+  },
 
-  // Block rows inside kid cards
-  blockRow: {
+  // ── Sync footer ───────────────────────────────────────────────────────────
+  syncRow: {
     flexDirection: RTL_ROW,
     alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
+    justifyContent: "space-between",
+    marginTop: S.lg,
+    paddingHorizontal: S.xs,
+    marginBottom: S.sm,
   },
-  blockRowHover: {
-    backgroundColor: "#DBEAFE",
-  },
-  blockStripe: {
-    width: 4,
-    borderRadius: 2,
-    alignSelf: "stretch",
-    marginEnd: 12,
-    marginStart: 4,
-  },
-  blockInfo: { flex: 1 },
-  blockTitle: { fontWeight: "600", color: "#1A1A2E", textAlign: "right" },
-  blockTime: { color: "#6B6B8D", marginTop: 2, textAlign: "right" },
-  blockType: {
-    fontSize: 10,
-    fontWeight: "600",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    overflow: "hidden",
-    marginStart: 8,
+  syncMeta: {
+    fontSize: 12,
+    color: C.textMuted,
+    textAlign: "right",
   },
 });
