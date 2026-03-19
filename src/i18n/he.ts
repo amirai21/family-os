@@ -101,6 +101,7 @@ const he = {
   // ── Grocery Add Modal ──
   groceryModal: {
     title: "הוספת פריט",
+    editTitle: "עריכת פריט",
     itemName: "שם הפריט",
     category: "קטגוריה",
     qty: "כמות (אופציונלי)",

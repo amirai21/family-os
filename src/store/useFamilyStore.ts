@@ -56,6 +56,7 @@ interface FamilyState {
     subcategory?: string;
     qty?: string;
   }) => GroceryItem;
+  updateGrocery: (id: string, patch: { title?: string; subcategory?: string; qty?: string }) => void;
   toggleGroceryBought: (id: string) => void;
   deleteGrocery: (id: string) => void;
   clearBought: (shoppingCategory?: ShoppingCategory) => string[];
@@ -215,6 +216,13 @@ export const useFamilyStore = create<FamilyState>()(
             g.id === id
               ? { ...g, isBought: !g.isBought, updatedAt: Date.now() }
               : g
+          ),
+        })),
+
+      updateGrocery: (id, patch) =>
+        set((s) => ({
+          grocery: s.grocery.map((g) =>
+            g.id === id ? { ...g, ...patch } : g,
           ),
         })),
 

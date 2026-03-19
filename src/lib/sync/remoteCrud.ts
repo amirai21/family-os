@@ -90,6 +90,18 @@ export function addGroceryRemote(input: {
   );
 }
 
+export function updateGroceryRemote(id: string, patch: { title?: string; subcategory?: string; qty?: string }) {
+  useFamilyStore.getState().updateGrocery(id, patch);
+  fireAndForget(
+    getFamilyId().then((fid) => {
+      const item = useFamilyStore.getState().grocery.find((g) => g.id === id);
+      if (!item) return;
+      return groceryApi.upsert(fid, localToApiGrocery(item));
+    }),
+    "Update grocery",
+  );
+}
+
 export function toggleGroceryBoughtRemote(id: string) {
   useFamilyStore.getState().toggleGroceryBought(id);
   const item = useFamilyStore.getState().grocery.find((g) => g.id === id);
