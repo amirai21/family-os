@@ -9,7 +9,7 @@ import { MEMBER_ROLES } from "@src/models/familyMember";
 import type { FamilyMember, MemberRole } from "@src/models/familyMember";
 import { t, memberRoleLabel } from "@src/i18n";
 import { C, R, S } from "@src/ui/tokens";
-import { MS } from "@src/ui/modalStyles";
+import { MS, SEGMENT_THEME, SEGMENT_COLORS } from "@src/ui/modalStyles";
 import { RTL_ROW } from "@src/ui/rtl";
 import ModalWrapper from "./ModalWrapper";
 
@@ -70,7 +70,7 @@ export default function FamilyMemberModal({ visible, onDismiss, editMember }: Pr
     onDismiss();
   };
 
-  const roleButtons = MEMBER_ROLES.map((r) => ({ value: r, label: memberRoleLabel(r) }));
+  const roleButtons = MEMBER_ROLES.map((r) => ({ value: r, label: memberRoleLabel(r), ...SEGMENT_COLORS }));
 
   return (
     <ModalWrapper visible={visible} onDismiss={onDismiss}>
@@ -96,6 +96,7 @@ export default function FamilyMemberModal({ visible, onDismiss, editMember }: Pr
         onValueChange={(v) => setRole(v as MemberRole)}
         buttons={roleButtons}
         style={MS.segmented}
+        theme={SEGMENT_THEME}
       />
 
       <Text style={MS.label}>{t("settings.memberEmoji")}</Text>

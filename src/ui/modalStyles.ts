@@ -7,6 +7,17 @@ import { StyleSheet } from "react-native";
 import { C, S, R } from "./tokens";
 import { RTL_ROW } from "./rtl";
 
+/** Blue theme for SegmentedButtons — pass as `theme` prop */
+export const SEGMENT_THEME = {
+  colors: { secondaryContainer: C.selectBg, onSecondaryContainer: C.selectText },
+} as const;
+
+/** Props for SegmentedButtons items — checkedColor + uncheckedColor */
+export const SEGMENT_COLORS = {
+  checkedColor: C.selectText,
+  uncheckedColor: C.textSecondary,
+} as const;
+
 export const MS = StyleSheet.create({
   heading: {
     fontWeight: "700",

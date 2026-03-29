@@ -286,12 +286,12 @@ export default function CalendarScreen() {
           value={calendarView}
           onValueChange={(v) => setCalendarView(v as CalendarView)}
           buttons={[
-            { value: "month", label: t("calendar.monthView"), checkedColor: "#1A6DB0", uncheckedColor: C.textSecondary },
-            { value: "week", label: t("calendar.weekView"), checkedColor: "#1A6DB0", uncheckedColor: C.textSecondary },
-            { value: "day", label: t("calendar.dayView"), checkedColor: "#1A6DB0", uncheckedColor: C.textSecondary },
+            { value: "month", label: t("calendar.monthView"), checkedColor: C.selectText, uncheckedColor: C.textSecondary },
+            { value: "week", label: t("calendar.weekView"), checkedColor: C.selectText, uncheckedColor: C.textSecondary },
+            { value: "day", label: t("calendar.dayView"), checkedColor: C.selectText, uncheckedColor: C.textSecondary },
           ]}
           style={styles.viewToggle}
-          theme={{ colors: { secondaryContainer: "#D6ECFA", onSecondaryContainer: "#1A6DB0" } }}
+          theme={{ colors: { secondaryContainer: C.selectBg, onSecondaryContainer: C.selectText } }}
         />
 
         {/* Calendar */}

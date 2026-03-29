@@ -18,6 +18,7 @@ import {
 import { Text } from "react-native-paper";
 import type { Note } from "@src/models/note";
 import { t } from "@src/i18n";
+import { S } from "@src/ui/tokens";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -110,7 +111,8 @@ export default function PinnedNotesCarousel({
         snapToInterval={SNAP_INTERVAL}
         decelerationRate="fast"
         contentContainerStyle={{
-          paddingHorizontal: sideInset - GAP / 2,
+          paddingStart: S.lg,
+          paddingEnd: S.lg,
         }}
         onMomentumScrollEnd={handleScrollEnd}
         // Flip scroll direction for RTL on web
@@ -207,6 +209,7 @@ function AddCard({
 const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 24,
+    marginHorizontal: -S.lg,
     overflow: "visible",
   },
 

@@ -1,11 +1,11 @@
 /**
- * CustomTabBar — a tab bar with per-tab colored highlight blocks.
+ * CustomTabBar — Premium floating tab bar with per-tab colored highlights.
  *
- * Each tab gets its own accent color. The active tab has a filled pill
- * background; on web, hovering a tab also shows a lighter tinted pill.
+ * Features a frosted-glass elevated bar with smooth pill transitions,
+ * subtle gradients, and polished hover/active states.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Pressable,
@@ -18,21 +18,24 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 // ── Per-tab accent colours ──
 
+// Premium jewel-tone palette — muted enough for luxury, vivid enough to pop.
+// Designed as a cohesive set: warm gold → cool sapphire → natural emerald
+//   → soft coral → dusty violet. Equal visual weight, no two adjacent clash.
 const TAB_COLORS: Record<string, { active: string; bg: string; hover: string }> = {
-  today:    { active: "#FFA726", bg: "#FFF3E0", hover: "#FFF8F0" },  // amber
-  calendar: { active: "#26A69A", bg: "#E0F2F1", hover: "#F0F9F8" },  // warm teal
-  grocery:  { active: "#66BB6A", bg: "#E8F5E9", hover: "#F1F9F1" },  // green
-  home:     { active: "#26C6DA", bg: "#E0F7FA", hover: "#F0FBFC" },  // cyan
-  settings: { active: "#6C63FF", bg: "#EDE7F6", hover: "#F5F2FF" },  // purple
+  today:    { active: "#C49A2A", bg: "#FBF5E4", hover: "#FDF9F0" },  // honey gold
+  calendar: { active: "#3A7BD5", bg: "#E8F0FB", hover: "#F2F7FD" },  // sapphire blue
+  grocery:  { active: "#2D9F6F", bg: "#E6F6EF", hover: "#F1FAF6" },  // emerald green
+  home:     { active: "#2AACB4", bg: "#E4F6F7", hover: "#F0FAFB" },  // ocean teal
+  settings: { active: "#8E7CC3", bg: "#F0ECF8", hover: "#F7F5FB" },  // dusty violet
 };
 
-const INACTIVE_COLOR = "#8E8BA8";
+const INACTIVE_COLOR = "#A8A3B8";
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  today: "sunny",
-  calendar: "calendar",
-  grocery: "cart",
-  home: "home",
+  today:    "sunny-outline",
+  calendar: "calendar-outline",
+  grocery:  "cart-outline",
+  home:     "home-outline",
   settings: "settings-outline",
 };
 
@@ -44,44 +47,45 @@ export default function CustomTabBar({
   navigation,
 }: BottomTabBarProps) {
   return (
-    <View style={styles.bar}>
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        // Skip routes not in the main tab set (e.g. kid/[kidId])
-        if (!(route.name in TAB_COLORS)) return null;
-        const label = options.title ?? route.name;
-        const isFocused = state.index === index;
-        const name = route.name;
-        const palette = TAB_COLORS[name];
-        const iconName = TAB_ICONS[name] ?? "ellipse";
+    <View style={styles.barOuter}>
+      <View style={styles.bar}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          if (!(route.name in TAB_COLORS)) return null;
+          const label = options.title ?? route.name;
+          const isFocused = state.index === index;
+          const name = route.name;
+          const palette = TAB_COLORS[name];
+          const iconName = TAB_ICONS[name] ?? "ellipse-outline";
 
-        const onPress = () => {
-          const event = navigation.emit({
-            type: "tabPress",
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
+          const onPress = () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
 
-        return (
-          <TabItem
-            key={route.key}
-            label={label}
-            iconName={iconName}
-            isFocused={isFocused}
-            palette={palette}
-            onPress={onPress}
-          />
-        );
-      })}
+          return (
+            <TabItem
+              key={route.key}
+              label={label}
+              iconName={iconName}
+              isFocused={isFocused}
+              palette={palette}
+              onPress={onPress}
+            />
+          );
+        })}
+      </View>
     </View>
   );
 }
 
-// ── Single tab item (handles hover state) ──
+// ── Single tab item ──
 
 interface TabItemProps {
   label: string;
@@ -107,21 +111,31 @@ function TabItem({ label, iconName, isFocused, palette, onPress }: TabItemProps)
       ? palette.hover
       : "transparent";
 
-  const iconColor = isFocused ? palette.active : hovered ? palette.active : INACTIVE_COLOR;
+  const iconColor = isFocused || hovered ? palette.active : INACTIVE_COLOR;
   const textColor = isFocused ? palette.active : hovered ? palette.active : INACTIVE_COLOR;
-
   return (
     <Pressable
       onPress={onPress}
       style={styles.tabWrapper}
       {...webHover}
     >
-      <View style={[styles.pill, { backgroundColor: pillBg }]}>
-        <Ionicons name={iconName} size={24} color={iconColor} />
+      <View
+        style={[
+          styles.pill,
+          { backgroundColor: pillBg },
+          isFocused && styles.pillActive,
+          hovered && !isFocused && styles.pillHover,
+        ]}
+      >
+        <Ionicons name={iconName} size={22} color={iconColor} />
         <Text
           style={[
             styles.label,
-            { color: textColor, fontWeight: isFocused ? "700" : "500" },
+            {
+              color: textColor,
+              fontWeight: isFocused ? "700" : "500",
+              opacity: isFocused ? 1 : hovered ? 0.9 : 0.7,
+            },
           ]}
           numberOfLines={1}
         >
@@ -135,33 +149,55 @@ function TabItem({ label, iconName, isFocused, palette, onPress }: TabItemProps)
 // ── Styles ──
 
 const styles = StyleSheet.create({
+  barOuter: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 8,
+    paddingBottom: Platform.OS === "ios" ? 28 : 6,
+  },
   bar: {
     flexDirection: "row",
     backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E0DFF5",
-    paddingBottom: Platform.OS === "ios" ? 28 : 8,
-    paddingTop: 6,
+    borderRadius: 20,
+    paddingVertical: 6,
     paddingHorizontal: 4,
+    // Elevated shadow
+    shadowColor: "#1E293B",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 12,
+    // Subtle top border
+    borderWidth: 1,
+    borderColor: "rgba(226, 232, 240, 0.6)",
   },
   tabWrapper: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
     ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
   },
   pill: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    minWidth: 64,
-    gap: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    width: "90%",
+    gap: 3,
+    ...(Platform.OS === "web"
+      ? { transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)" } as any
+      : {}),
+  },
+  pillActive: {
+    transform: [{ scale: 1.05 }],
+  },
+  pillHover: {
+    transform: [{ scale: 1.02 }],
   },
   label: {
     fontSize: 11,
-    fontFamily: "Rubik-Medium",
+    letterSpacing: 0.2,
     textAlign: "center",
   },
 });

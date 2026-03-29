@@ -30,6 +30,10 @@ export const C = {
   // Interactive
   hoverBg: "#F0F0F5",
   pressedBg: "#E8E8F0",
+
+  // Selection (blue theme for segmented buttons, chips, toggles)
+  selectBg: "#D6ECFA",
+  selectText: "#1A6DB0",
 } as const;
 
 // ---------------------------------------------------------------------------

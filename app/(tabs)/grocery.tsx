@@ -46,6 +46,8 @@ export default function GroceryScreen() {
   const segmentButtons = SHOPPING_CATEGORIES.map((cat) => ({
     value: cat,
     label: shoppingCategoryLabel(cat),
+    checkedColor: C.selectText,
+    uncheckedColor: C.textSecondary,
   }));
 
   return (
@@ -60,7 +62,7 @@ export default function GroceryScreen() {
           onValueChange={(v) => setSelectedCategory(v as ShoppingCategory)}
           buttons={segmentButtons}
           style={styles.segments}
-          theme={{ colors: { secondaryContainer: "#D6ECFA", onSecondaryContainer: "#1A6DB0" } }}
+          theme={{ colors: { secondaryContainer: C.selectBg, onSecondaryContainer: C.selectText } }}
         />
 
         {/* Item count + clear all */}
