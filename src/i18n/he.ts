@@ -63,6 +63,7 @@ const he = {
     noProjects: "אין עדיין פרויקטים — חלמו בגדול",
     kids: "ילדים",
     noKids: "אין ילדים — לחצו על + כדי להוסיף",
+    viewSchedule: "צפייה במערכת",
   },
 
   // ── Grocery screen ──

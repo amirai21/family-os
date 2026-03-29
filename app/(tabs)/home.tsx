@@ -1,12 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Platform } from "react-native";
 import {
-  Card,
   Text,
   IconButton,
-  Checkbox,
-  Divider,
-  ProgressBar,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -33,15 +29,48 @@ import { t, statusLabel } from "@src/i18n";
 import FamilyBadge from "@src/components/FamilyBadge";
 import SectionHeader from "@src/components/SectionHeader";
 import { RTL_ROW } from "@src/ui/rtl";
-import { C, R, S } from "@src/ui/tokens";
+import { C, R, S, SHADOW } from "@src/ui/tokens";
 import { STATUS_COLORS } from "@src/ui/semanticColors";
+
+// Note section colors (warm amber/yellow palette)
+const NOTE_COLORS = {
+  accent: "#D97706",       // warm amber
+  bg: "#FFFBF0",           // soft cream
+  bgPinned: "#FFF8E1",     // warmer cream for pinned
+  border: "#F5E6C8",       // subtle amber border
+  borderPinned: "#EAD49B", // stronger amber for pinned
+  hover: "#FFF3D6",        // warm hover
+  barDefault: "#E8D5B0",   // muted bar
+} as const;
+
+// Chore section colors (teal/green productivity palette)
+const CHORE_COLORS = {
+  accent: "#0D9488",        // teal-600
+  accentLight: "#14B8A6",   // teal-500
+  bg: "#F0FDFA",            // teal-50
+  bgDone: "#F7F7F8",        // neutral muted
+  border: "#CCFBF1",        // teal-100
+  borderDone: "#E5E5EA",
+  hover: "#E0FAF5",
+  checkBg: "#0D948818",
+  checkBgDone: "#0D948830",
+  todayBadge: "#FEF3C7",    // amber-100
+  todayBadgeText: "#B45309", // amber-700
+} as const;
+
+// Project section colors (purple/indigo board palette)
+const PROJECT_COLORS = {
+  accent: "#6C63FF",        // indigo
+  bg: "#F8F7FF",            // faint lavender
+  border: "#E8E5FF",        // light indigo border
+  hover: "#EEEAFF",         // warm hover
+} as const;
 
 // ---------------------------------------------------------------------------
 // ChoreRow — reusable row for both sections
 // ---------------------------------------------------------------------------
 
 function ChoreRow({ chore, onEdit, onDelete }: { chore: Chore; onEdit: () => void; onDelete: () => void }) {
-  const [hovered, setHovered] = useState(false);
   const assignedMember = useFamilyStore((s) =>
     chore.assignedToMemberId
       ? s.familyMembers.find((m) => m.id === chore.assignedToMemberId)
@@ -52,47 +81,65 @@ function ChoreRow({ chore, onEdit, onDelete }: { chore: Chore; onEdit: () => voi
     : chore.assignedTo;
 
   return (
-    <View
-      style={[styles.choreRow, hovered && styles.choreRowHover]}
-      {...(Platform.OS === "web" ? {
-        onPointerEnter: () => setHovered(true),
-        onPointerLeave: () => setHovered(false),
-      } : {} as any)}
+    <Pressable
+      style={({ pressed, hovered }: any) => [
+        styles.choreCard,
+        chore.done && styles.choreCardDone,
+        hovered && !chore.done && styles.choreCardHover,
+        pressed && { transform: [{ scale: 0.98 }] },
+      ]}
+      onPress={onEdit}
     >
-      <Checkbox
-        status={chore.done ? "checked" : "unchecked"}
+      {/* Checkbox circle */}
+      <Pressable
+        style={[styles.choreCheckCircle, chore.done && styles.choreCheckCircleDone]}
         onPress={() => toggleChoreDoneRemote(chore.id)}
-      />
-      <View style={styles.choreText}>
-        <Text
-          variant="bodyLarge"
-          style={chore.done ? styles.choreDone : styles.choreTitle}
-        >
-          {chore.title}
-        </Text>
+      >
+        {chore.done ? (
+          <Text style={{ fontSize: 14, color: "#fff" }}>✓</Text>
+        ) : null}
+      </Pressable>
+
+      {/* Content */}
+      <View style={styles.choreContent}>
+        <View style={styles.choreTopLine}>
+          <Text
+            style={[styles.choreTitle, chore.done && styles.choreTitleDone]}
+            numberOfLines={1}
+          >
+            {chore.title}
+          </Text>
+          {chore.selectedForToday && !chore.done && (
+            <View style={styles.choreTodayBadge}>
+              <Text style={styles.choreTodayBadgeText}>⭐ היום</Text>
+            </View>
+          )}
+        </View>
         {assigneeDisplay ? (
-          <Text variant="bodySmall" style={styles.assignee}>
+          <Text style={styles.choreAssignee}>
             {assigneeDisplay}
           </Text>
         ) : null}
       </View>
-      <IconButton
-        icon="pencil-outline"
-        size={18}
-        onPress={onEdit}
-      />
-      <IconButton
-        icon={chore.selectedForToday ? "white-balance-sunny" : "white-balance-sunny"}
-        size={18}
-        iconColor={chore.selectedForToday ? C.amber : C.border}
-        onPress={() => toggleChoreSelectedForTodayRemote(chore.id)}
-      />
-      <IconButton
-        icon="trash-can-outline"
-        size={18}
-        onPress={onDelete}
-      />
-    </View>
+
+      {/* Actions */}
+      <View style={styles.choreActions}>
+        <IconButton
+          icon={chore.selectedForToday ? "white-balance-sunny" : "white-balance-sunny"}
+          size={16}
+          iconColor={chore.selectedForToday ? C.amber : C.textMuted}
+          style={styles.choreActionBtn}
+          onPress={() => toggleChoreSelectedForTodayRemote(chore.id)}
+        />
+        <IconButton
+          icon="trash-can-outline"
+          size={16}
+          iconColor={C.textMuted}
+          style={styles.choreActionBtn}
+          onPress={onDelete}
+        />
+      </View>
+    </Pressable>
   );
 }
 
@@ -118,10 +165,8 @@ export default function HomeScreen() {
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
   const [kidModalOpen, setKidModalOpen] = useState(false);
   const [editingKid, setEditingKid] = useState<Kid | null>(null);
-  const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
 
   // Notes sorted: pinned first
   const sortedNotes = [...notes].sort(
@@ -140,264 +185,335 @@ export default function HomeScreen() {
 
         {/* -- Kids -- */}
         <SectionHeader label={t("home.kids")} />
-        <Card style={styles.card} mode="elevated">
-          <Card.Content>
-            <View style={styles.cardHeaderRow}>
-              <View style={{ flex: 1 }} />
-              <IconButton
-                icon="plus"
-                size={20}
-                onPress={() => {
-                  setEditingKid(null);
-                  setKidModalOpen(true);
-                }}
-              />
-            </View>
+        <View style={styles.kidsContainer}>
+          <View style={styles.kidsHeaderRow}>
+            <View style={{ flex: 1 }} />
+            <IconButton
+              icon="plus"
+              size={20}
+              style={styles.kidsAddBtn}
+              onPress={() => {
+                setEditingKid(null);
+                setKidModalOpen(true);
+              }}
+            />
+          </View>
 
-            {activeKids.length === 0 && (
-              <Text variant="bodyMedium" style={styles.emptyText}>
-                {t("home.noKids")}
-              </Text>
-            )}
+          {activeKids.length === 0 && (
+            <Text variant="bodyMedium" style={{ color: C.textMuted, textAlign: "right", fontSize: 14, paddingVertical: S.xs }}>
+              {t("home.noKids")}
+            </Text>
+          )}
 
-            <View style={styles.kidsRow}>
-              {activeKids.map((kid) => (
-                <Pressable
-                  key={kid.id}
-                  style={[styles.kidCard, { backgroundColor: kid.color + "18", borderColor: kid.color + "44" }]}
-                  onPress={() => router.push(`/kid/${kid.id}`)}
-                >
+          <View style={styles.kidsRow}>
+            {activeKids.map((kid) => (
+              <Pressable
+                key={kid.id}
+                style={({ pressed, hovered }: any) => [
+                  styles.kidCard,
+                  {
+                    backgroundColor: kid.color + "10",
+                    borderColor: kid.color + "30",
+                  },
+                  hovered && {
+                    backgroundColor: kid.color + "20",
+                    borderColor: kid.color + "50",
+                    transform: [{ translateY: -2 }],
+                    ...SHADOW.md,
+                  },
+                  pressed && {
+                    backgroundColor: kid.color + "28",
+                    transform: [{ scale: 0.97 }],
+                  },
+                ]}
+                onPress={() => router.push(`/kid/${kid.id}`)}
+              >
+                <View style={[styles.kidAvatarCircle, { backgroundColor: kid.color + "18" }]}>
                   <Text style={styles.kidEmoji}>{kid.emoji}</Text>
-                  <View style={styles.kidEmojiSpacer} />
-                  <Text style={[styles.kidName, { color: kid.color }]}>{kid.name}</Text>
-                  <Text style={[styles.kidArrow, { color: kid.color }]}>‹</Text>
-                </Pressable>
-              ))}
-            </View>
-          </Card.Content>
-        </Card>
+                </View>
+                <View style={styles.kidInfo}>
+                  <Text style={[styles.kidName, { color: C.textPrimary }]}>{kid.name}</Text>
+                  <Text style={[styles.kidScheduleHint, { color: kid.color }]}>
+                    {t("home.viewSchedule")}
+                  </Text>
+                </View>
+                <Text style={[styles.kidArrow, { color: kid.color + "90" }]}>‹</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
 
         {/* -- Notes -- */}
         <SectionHeader label={t("home.notes")} />
-        <Card style={styles.card} mode="elevated">
-          <Card.Content>
-            <View style={styles.cardHeaderRow}>
-              <View style={{ flex: 1 }} />
-              <IconButton
-                icon="plus"
-                size={20}
+        <View style={styles.notesContainer}>
+          <View style={styles.notesHeaderRow}>
+            <View style={{ flex: 1 }} />
+            <IconButton
+              icon="plus"
+              size={20}
+              style={styles.notesAddBtn}
+              iconColor={NOTE_COLORS.accent}
+              onPress={() => {
+                setEditingNote(null);
+                setNoteModalOpen(true);
+              }}
+            />
+          </View>
+
+          {notes.length === 0 && (
+            <Text variant="bodyMedium" style={styles.notesEmpty}>
+              {t("home.noNotes")}
+            </Text>
+          )}
+
+          <View style={styles.notesGrid}>
+            {sortedNotes.map((note) => (
+              <Pressable
+                key={note.id}
+                style={({ pressed, hovered }: any) => [
+                  styles.noteCard,
+                  note.pinned && styles.noteCardPinned,
+                  hovered && styles.noteCardHover,
+                  pressed && styles.noteCardPressed,
+                ]}
                 onPress={() => {
-                  setEditingNote(null);
+                  setEditingNote(note);
                   setNoteModalOpen(true);
                 }}
-              />
-            </View>
-
-            {notes.length === 0 && (
-              <Text variant="bodyMedium" style={styles.emptyText}>
-                {t("home.noNotes")}
-              </Text>
-            )}
-
-            {sortedNotes.map((note) => (
-              <View
-                key={note.id}
-                style={[styles.noteRow, hoveredNoteId === note.id && styles.noteRowHover]}
-                {...(Platform.OS === "web" ? {
-                  onPointerEnter: () => setHoveredNoteId(note.id),
-                  onPointerLeave: () => setHoveredNoteId(null),
-                } : {} as any)}
               >
-                <View style={styles.noteContent}>
-                  <Text variant="bodyLarge" style={styles.noteTitle}>
-                    {note.pinned ? "\uD83D\uDCCC " : ""}
-                    {note.title || t("home.note")}
-                  </Text>
-                  <Text
-                    variant="bodySmall"
-                    style={styles.noteBody}
-                    numberOfLines={2}
-                  >
+                {/* Top row: pin icon + actions */}
+                <View style={styles.noteTopRow}>
+                  <View style={styles.noteIcon}>
+                    <Text style={{ fontSize: 18 }}>{note.pinned ? "📌" : "📝"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }} />
+                  <IconButton
+                    icon={note.pinned ? "pin-off" : "pin"}
+                    size={16}
+                    iconColor={NOTE_COLORS.accent}
+                    style={styles.noteActionBtn}
+                    onPress={() => toggleNotePinnedRemote(note.id)}
+                  />
+                  <IconButton
+                    icon="trash-can-outline"
+                    size={16}
+                    iconColor={C.textMuted}
+                    style={styles.noteActionBtn}
+                    onPress={() => requestDelete(() => deleteNoteRemote(note.id))}
+                  />
+                </View>
+
+                {/* Note content */}
+                <Text style={styles.noteTitle} numberOfLines={1}>
+                  {note.title || t("home.note")}
+                </Text>
+                {note.body ? (
+                  <Text style={styles.noteBody} numberOfLines={3}>
                     {note.body}
                   </Text>
-                </View>
-                <IconButton
-                  icon="pencil-outline"
-                  size={18}
-                  onPress={() => {
-                    setEditingNote(note);
-                    setNoteModalOpen(true);
-                  }}
-                />
-                <IconButton
-                  icon={note.pinned ? "pin-off" : "pin"}
-                  size={18}
-                  onPress={() => toggleNotePinnedRemote(note.id)}
-                />
-                <IconButton
-                  icon="trash-can-outline"
-                  size={18}
-                  onPress={() => requestDelete(() => deleteNoteRemote(note.id))}
-                />
-              </View>
+                ) : null}
+
+                {/* Bottom accent bar */}
+                <View style={[
+                  styles.noteAccentBar,
+                  note.pinned && { backgroundColor: NOTE_COLORS.accent },
+                ]} />
+              </Pressable>
             ))}
-          </Card.Content>
-        </Card>
+          </View>
+        </View>
 
         {/* -- Chores -- */}
         <SectionHeader label={t("home.chores")} />
-        <Card style={styles.card} mode="elevated">
-          <Card.Content>
-            <View style={styles.cardHeaderRow}>
-              <View style={{ flex: 1 }} />
-              <IconButton
-                icon="plus"
-                size={20}
-                onPress={() => {
-                  setEditingChore(null);
-                  setChoreModalOpen(true);
-                }}
-              />
-            </View>
-
-            {chores.length === 0 && (
-              <Text variant="bodyMedium" style={styles.emptyText}>
-                {t("home.allClear")}
-              </Text>
-            )}
-
-            {/* Selected for today */}
-            {selectedChores.length > 0 && (
-              <>
-                <Text variant="labelLarge" style={styles.subSectionLabel}>
-                  ⭐ {t("home.selectedForToday")}
+        <View style={styles.choresContainer}>
+          <View style={styles.choresHeaderRow}>
+            {/* Stats pill */}
+            {chores.length > 0 && (
+              <View style={styles.choresStatsPill}>
+                <Text style={styles.choresStatsText}>
+                  {chores.filter((c) => c.done).length}/{chores.length} ✓
                 </Text>
-                {selectedChores.map((chore) => (
-                  <ChoreRow
-                    key={chore.id}
-                    chore={chore}
-                    onEdit={() => {
-                      setEditingChore(chore);
-                      setChoreModalOpen(true);
-                    }}
-                    onDelete={() => requestDelete(() => deleteChoreRemote(chore.id))}
-                  />
-                ))}
-              </>
+              </View>
             )}
+            <View style={{ flex: 1 }} />
+            <IconButton
+              icon="plus"
+              size={20}
+              style={styles.choresAddBtn}
+              iconColor={CHORE_COLORS.accent}
+              onPress={() => {
+                setEditingChore(null);
+                setChoreModalOpen(true);
+              }}
+            />
+          </View>
 
-            {/* Divider between sections */}
-            {selectedChores.length > 0 && backlogChores.length > 0 && (
-              <Divider style={styles.choreDivider} />
-            )}
+          {chores.length === 0 && (
+            <View style={styles.choresEmptyState}>
+              <Text style={{ fontSize: 32 }}>🎉</Text>
+              <Text style={styles.choresEmptyText}>{t("home.allClear")}</Text>
+            </View>
+          )}
 
-            {/* Backlog */}
-            {backlogChores.length > 0 && (
-              <>
-                {selectedChores.length > 0 && (
-                  <Text variant="labelLarge" style={styles.subSectionLabel}>
+          {/* Selected for today */}
+          {selectedChores.length > 0 && (
+            <>
+              <View style={styles.choresSectionHeader}>
+                <View style={styles.choresSectionDot} />
+                <Text style={styles.choresSectionTitle}>
+                  {t("home.selectedForToday")}
+                </Text>
+                <Text style={styles.choresSectionCount}>{selectedChores.length}</Text>
+              </View>
+              {selectedChores.map((chore) => (
+                <ChoreRow
+                  key={chore.id}
+                  chore={chore}
+                  onEdit={() => {
+                    setEditingChore(chore);
+                    setChoreModalOpen(true);
+                  }}
+                  onDelete={() => requestDelete(() => deleteChoreRemote(chore.id))}
+                />
+              ))}
+            </>
+          )}
+
+          {/* Divider between sections */}
+          {selectedChores.length > 0 && backlogChores.length > 0 && (
+            <View style={styles.choresDivider}>
+              <View style={styles.choresDividerLine} />
+            </View>
+          )}
+
+          {/* Backlog */}
+          {backlogChores.length > 0 && (
+            <>
+              {selectedChores.length > 0 && (
+                <View style={styles.choresSectionHeader}>
+                  <View style={[styles.choresSectionDot, { backgroundColor: C.textMuted }]} />
+                  <Text style={[styles.choresSectionTitle, { color: C.textSecondary }]}>
                     {t("home.backlog")}
                   </Text>
-                )}
-                {backlogChores.map((chore) => (
-                  <ChoreRow
-                    key={chore.id}
-                    chore={chore}
-                    onEdit={() => {
-                      setEditingChore(chore);
-                      setChoreModalOpen(true);
-                    }}
-                    onDelete={() => requestDelete(() => deleteChoreRemote(chore.id))}
-                  />
-                ))}
-              </>
-            )}
-          </Card.Content>
-        </Card>
+                  <Text style={styles.choresSectionCount}>{backlogChores.length}</Text>
+                </View>
+              )}
+              {backlogChores.map((chore) => (
+                <ChoreRow
+                  key={chore.id}
+                  chore={chore}
+                  onEdit={() => {
+                    setEditingChore(chore);
+                    setChoreModalOpen(true);
+                  }}
+                  onDelete={() => requestDelete(() => deleteChoreRemote(chore.id))}
+                />
+              ))}
+            </>
+          )}
+        </View>
 
         {/* -- Projects -- */}
         <SectionHeader label={t("home.projects")} />
-        <Card style={styles.card} mode="elevated">
-          <Card.Content>
-            <View style={styles.cardHeaderRow}>
-              <View style={{ flex: 1 }} />
-              <IconButton
-                icon="plus"
-                size={20}
+        <View style={styles.projectsContainer}>
+          <View style={styles.projectsHeaderRow}>
+            {projects.length > 0 && (
+              <View style={styles.projectsStatsPill}>
+                <Text style={styles.projectsStatsText}>
+                  {projects.filter((p) => p.status === "in_progress").length} {t("today.activeProjects").toLowerCase()}
+                </Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }} />
+            <IconButton
+              icon="plus"
+              size={20}
+              style={styles.projectsAddBtn}
+              iconColor={PROJECT_COLORS.accent}
+              onPress={() => {
+                setEditingProject(null);
+                setProjectModalOpen(true);
+              }}
+            />
+          </View>
+
+          {projects.length === 0 && (
+            <View style={styles.projectsEmptyState}>
+              <Text style={{ fontSize: 32 }}>🚀</Text>
+              <Text style={styles.projectsEmptyText}>{t("home.noProjects")}</Text>
+            </View>
+          )}
+
+          {projects.map((proj) => {
+            const statusColor = STATUS_COLORS[proj.status];
+            const statusEmoji = proj.status === "done" ? "✅" : proj.status === "in_progress" ? "🔨" : "💡";
+            return (
+              <Pressable
+                key={proj.id}
+                style={({ pressed, hovered }: any) => [
+                  styles.projectCard,
+                  hovered && styles.projectCardHover,
+                  pressed && { transform: [{ scale: 0.98 }] },
+                ]}
                 onPress={() => {
-                  setEditingProject(null);
+                  setEditingProject(proj);
                   setProjectModalOpen(true);
                 }}
-              />
-            </View>
-
-            {projects.length === 0 && (
-              <Text variant="bodyMedium" style={styles.emptyText}>
-                {t("home.noProjects")}
-              </Text>
-            )}
-
-            {projects.map((proj) => (
-              <View
-                key={proj.id}
-                style={[styles.projectRow, hoveredProjectId === proj.id && styles.projectRowHover]}
-                {...(Platform.OS === "web" ? {
-                  onPointerEnter: () => setHoveredProjectId(proj.id),
-                  onPointerLeave: () => setHoveredProjectId(null),
-                } : {} as any)}
               >
-                <View style={styles.projectContent}>
-                  <View style={styles.projectTop}>
-                    <Text variant="bodyLarge" style={styles.projectTitle}>
-                      {proj.title}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.statusBadge,
-                        {
-                          color: STATUS_COLORS[proj.status],
-                          backgroundColor: STATUS_COLORS[proj.status] + "22",
-                        },
-                      ]}
-                    >
-                      {statusLabel(proj.status)}
-                    </Text>
+                {/* Left accent stripe */}
+                <View style={[styles.projectStripe, { backgroundColor: statusColor }]} />
+
+                {/* Main content */}
+                <View style={styles.projectBody}>
+                  <View style={styles.projectTopRow}>
+                    <View style={[styles.projectStatusChip, { backgroundColor: statusColor + "18" }]}>
+                      <Text style={{ fontSize: 12 }}>{statusEmoji}</Text>
+                      <Text style={[styles.projectStatusText, { color: statusColor }]}>
+                        {statusLabel(proj.status)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }} />
+                    <IconButton
+                      icon="trash-can-outline"
+                      size={16}
+                      iconColor={C.textMuted}
+                      style={styles.projectActionBtn}
+                      onPress={() => requestDelete(() => deleteProjectRemote(proj.id))}
+                    />
                   </View>
+
+                  <Text style={styles.projectTitle} numberOfLines={1}>
+                    {proj.title}
+                  </Text>
+
                   {proj.description ? (
-                    <Text
-                      variant="bodySmall"
-                      style={styles.projDesc}
-                      numberOfLines={1}
-                    >
+                    <Text style={styles.projDesc} numberOfLines={2}>
                       {proj.description}
                     </Text>
                   ) : null}
-                  <ProgressBar
-                    progress={proj.progress / 100}
-                    color={STATUS_COLORS[proj.status]}
-                    style={styles.progressBar}
-                  />
-                  <Text variant="labelSmall" style={styles.progressLabel}>
-                    {proj.progress}%
-                  </Text>
+
+                  {/* Progress bar */}
+                  <View style={styles.projectProgressRow}>
+                    <View style={styles.projectProgressTrack}>
+                      <View
+                        style={[
+                          styles.projectProgressFill,
+                          {
+                            backgroundColor: statusColor,
+                            width: `${proj.progress}%` as any,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.projectProgressLabel, { color: statusColor }]}>
+                      {proj.progress}%
+                    </Text>
+                  </View>
                 </View>
-                <IconButton
-                  icon="pencil-outline"
-                  size={18}
-                  onPress={() => {
-                    setEditingProject(proj);
-                    setProjectModalOpen(true);
-                  }}
-                />
-                <IconButton
-                  icon="trash-can-outline"
-                  size={18}
-                  onPress={() => requestDelete(() => deleteProjectRemote(proj.id))}
-                />
-              </View>
-            ))}
-          </Card.Content>
-        </Card>
+              </Pressable>
+            );
+          })}
+        </View>
       </ScrollView>
 
       <NoteModal
@@ -451,105 +567,420 @@ const styles = StyleSheet.create({
     marginBottom: S.lg,
     textAlign: "right",
   },
-  card: { borderRadius: R.lg, backgroundColor: C.surface, marginBottom: S.lg },
-  cardHeaderRow: {
+  // Kids
+  kidsContainer: {
+    gap: S.xs,
+  },
+  kidsHeaderRow: {
     flexDirection: RTL_ROW,
     alignItems: "center",
-    justifyContent: "flex-end",
     marginBottom: S.xs,
-    marginTop: -S.sm,
   },
-  emptyText: {
-    color: C.textMuted,
-    textAlign: "right",
-    fontSize: 14,
-    paddingVertical: S.xs,
+  kidsAddBtn: {
+    margin: 0,
   },
-
-  // Kids
   kidsRow: {
     flexDirection: RTL_ROW,
     flexWrap: "wrap",
-    gap: S.sm,
+    gap: S.md,
   },
   kidCard: {
     flexDirection: RTL_ROW,
     alignItems: "center",
-    paddingVertical: S.md,
-    paddingHorizontal: S.lg,
-    borderRadius: R.md,
+    paddingVertical: S.lg,
+    paddingHorizontal: S.lg + 4,
+    borderRadius: R.lg,
     borderWidth: 1,
-    gap: S.sm,
+    gap: S.md,
+    minWidth: 160,
+    flex: 1,
+    backgroundColor: C.surface,
+    ...SHADOW.sm,
+    ...(Platform.OS === "web" ? { cursor: "pointer" as any, transition: "all 0.2s ease" } : {}),
   },
-  kidEmoji: { fontSize: 22 },
-  kidEmojiSpacer: { width: S.xs },
-  kidName: { fontWeight: "700", fontSize: 15 },
-  kidArrow: { fontSize: 18, fontWeight: "700", marginStart: "auto" },
+  kidAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  kidEmoji: { fontSize: 26 },
+  kidInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  kidName: { fontWeight: "700", fontSize: 16 },
+  kidScheduleHint: { fontSize: 12, fontWeight: "500" },
+  kidArrow: { fontSize: 20, fontWeight: "700" },
 
   // Notes
-  noteRow: {
+  notesContainer: {
+    gap: S.xs,
+  },
+  notesHeaderRow: {
     flexDirection: RTL_ROW,
     alignItems: "center",
-    paddingVertical: S.sm,
-    paddingHorizontal: S.xs,
-    borderRadius: R.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.border,
+    marginBottom: S.xs,
   },
-  noteRowHover: { backgroundColor: C.hoverBg },
-  noteContent: { flex: 1 },
-  noteTitle: { fontSize: 15, fontWeight: "600", color: C.textPrimary, textAlign: "right" },
-  noteBody: { fontSize: 12, color: C.textSecondary, marginTop: 2, textAlign: "right" },
+  notesAddBtn: {
+    margin: 0,
+    backgroundColor: NOTE_COLORS.accent + "12",
+    borderRadius: R.sm,
+  },
+  notesEmpty: {
+    color: C.textMuted,
+    textAlign: "right",
+    fontSize: 14,
+    paddingVertical: S.lg,
+  },
+  notesGrid: {
+    flexDirection: RTL_ROW,
+    flexWrap: "wrap",
+    gap: S.md,
+  },
+  noteCard: {
+    backgroundColor: NOTE_COLORS.bg,
+    borderWidth: 1,
+    borderColor: NOTE_COLORS.border,
+    borderRadius: R.lg,
+    padding: S.lg,
+    minWidth: 160,
+    flex: 1,
+    maxWidth: "100%" as any,
+    ...SHADOW.sm,
+    ...(Platform.OS === "web"
+      ? { cursor: "pointer" as any, transition: "all 0.2s ease" }
+      : {}),
+    overflow: "hidden" as const,
+  },
+  noteCardPinned: {
+    backgroundColor: NOTE_COLORS.bgPinned,
+    borderColor: NOTE_COLORS.borderPinned,
+  },
+  noteCardHover: {
+    backgroundColor: NOTE_COLORS.hover,
+    borderColor: NOTE_COLORS.borderPinned,
+    transform: [{ translateY: -2 }],
+    ...SHADOW.md,
+  },
+  noteCardPressed: {
+    transform: [{ scale: 0.97 }],
+  },
+  noteTopRow: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    marginBottom: S.sm,
+  },
+  noteIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: NOTE_COLORS.accent + "14",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  noteActionBtn: {
+    margin: 0,
+    width: 28,
+    height: 28,
+  },
+  noteTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.textPrimary,
+    textAlign: "right",
+    marginBottom: 4,
+  },
+  noteBody: {
+    fontSize: 13,
+    color: C.textSecondary,
+    textAlign: "right",
+    lineHeight: 19,
+  },
+  noteAccentBar: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: NOTE_COLORS.barDefault,
+    marginTop: S.md,
+  },
 
   // Chores
-  subSectionLabel: {
-    color: C.textSecondary,
-    fontWeight: "600",
-    marginTop: S.sm,
-    marginBottom: S.xs,
-    textAlign: "right",
+  choresContainer: {
+    gap: S.xs,
   },
-  choreDivider: { marginVertical: S.sm },
-  choreRow: {
+  choresHeaderRow: {
     flexDirection: RTL_ROW,
     alignItems: "center",
+    marginBottom: S.sm,
+  },
+  choresAddBtn: {
+    margin: 0,
+    backgroundColor: CHORE_COLORS.accent + "12",
+    borderRadius: R.sm,
+  },
+  choresStatsPill: {
+    backgroundColor: CHORE_COLORS.accent + "14",
+    paddingHorizontal: S.md,
     paddingVertical: S.xs,
-    paddingHorizontal: S.xs,
-    borderRadius: R.sm,
+    borderRadius: 20,
   },
-  choreRowHover: { backgroundColor: C.hoverBg },
-  choreText: { flex: 1, marginStart: S.xs },
-  choreTitle: { fontSize: 15, color: C.textPrimary, textAlign: "right" },
-  choreDone: { fontSize: 15, textDecorationLine: "line-through", color: C.textMuted, textAlign: "right" },
-  assignee: { fontSize: 12, color: C.textSecondary, textAlign: "right", marginTop: 1 },
-
-  // Projects
-  projectRow: {
+  choresStatsText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: CHORE_COLORS.accent,
+  },
+  choresEmptyState: {
+    alignItems: "center" as const,
+    paddingVertical: S.xl,
+    gap: S.sm,
+  },
+  choresEmptyText: {
+    color: C.textMuted,
+    fontSize: 14,
+  },
+  choresSectionHeader: {
     flexDirection: RTL_ROW,
-    alignItems: "flex-start",
-    paddingVertical: S.md,
-    paddingHorizontal: S.xs,
-    borderRadius: R.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.border,
+    alignItems: "center",
+    gap: S.sm,
+    marginTop: S.sm,
+    marginBottom: S.xs,
   },
-  projectRowHover: { backgroundColor: C.hoverBg },
-  projectContent: { flex: 1 },
-  projectTop: {
+  choresSectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: CHORE_COLORS.accent,
+  },
+  choresSectionTitle: {
+    color: CHORE_COLORS.accent,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  choresSectionCount: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.textMuted,
+    backgroundColor: C.hoverBg,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: "hidden" as const,
+  },
+  choresDivider: {
+    paddingVertical: S.md,
+    alignItems: "center" as const,
+  },
+  choresDividerLine: {
+    height: 1,
+    width: "90%" as any,
+    backgroundColor: CHORE_COLORS.border,
+  },
+  choreCard: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    backgroundColor: CHORE_COLORS.bg,
+    borderWidth: 1,
+    borderColor: CHORE_COLORS.border,
+    borderRadius: R.md,
+    padding: S.md,
+    marginBottom: S.sm,
+    gap: S.md,
+    ...SHADOW.sm,
+    ...(Platform.OS === "web"
+      ? { cursor: "pointer" as any, transition: "all 0.2s ease" }
+      : {}),
+  },
+  choreCardDone: {
+    backgroundColor: CHORE_COLORS.bgDone,
+    borderColor: CHORE_COLORS.borderDone,
+    opacity: 0.75,
+  },
+  choreCardHover: {
+    backgroundColor: CHORE_COLORS.hover,
+    borderColor: CHORE_COLORS.accentLight + "40",
+    transform: [{ translateY: -1 }],
+    ...SHADOW.md,
+  },
+  choreCheckCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: CHORE_COLORS.accent,
+    backgroundColor: CHORE_COLORS.checkBg,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  choreCheckCircleDone: {
+    backgroundColor: CHORE_COLORS.accent,
+    borderColor: CHORE_COLORS.accent,
+  },
+  choreContent: {
+    flex: 1,
+    gap: 2,
+  },
+  choreTopLine: {
     flexDirection: RTL_ROW,
     alignItems: "center",
     gap: S.sm,
   },
-  projectTitle: { flex: 1, fontSize: 15, fontWeight: "600", color: C.textPrimary, textAlign: "right" },
-  statusBadge: {
-    fontSize: 10,
+  choreTitle: {
+    fontSize: 15,
     fontWeight: "600",
-    paddingHorizontal: S.sm,
-    paddingVertical: 3,
-    borderRadius: R.sm,
-    overflow: "hidden",
+    color: C.textPrimary,
+    textAlign: "right",
+    flex: 1,
   },
-  projDesc: { fontSize: 12, color: C.textSecondary, marginTop: S.xs, textAlign: "right" },
-  progressBar: { height: 4, borderRadius: 2, marginTop: S.sm },
-  progressLabel: { fontSize: 11, color: C.textMuted, marginTop: 2, textAlign: "right" },
+  choreTitleDone: {
+    textDecorationLine: "line-through" as const,
+    color: C.textMuted,
+    fontWeight: "400" as const,
+  },
+  choreTodayBadge: {
+    backgroundColor: CHORE_COLORS.todayBadge,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  choreTodayBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: CHORE_COLORS.todayBadgeText,
+  },
+  choreAssignee: {
+    fontSize: 12,
+    color: C.textSecondary,
+    textAlign: "right",
+    marginTop: 1,
+  },
+  choreActions: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+  },
+  choreActionBtn: {
+    margin: 0,
+    width: 28,
+    height: 28,
+  },
+
+  // Projects
+  projectsContainer: {
+    gap: S.xs,
+  },
+  projectsHeaderRow: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    marginBottom: S.sm,
+  },
+  projectsAddBtn: {
+    margin: 0,
+    backgroundColor: PROJECT_COLORS.accent + "12",
+    borderRadius: R.sm,
+  },
+  projectsStatsPill: {
+    backgroundColor: PROJECT_COLORS.accent + "14",
+    paddingHorizontal: S.md,
+    paddingVertical: S.xs,
+    borderRadius: 20,
+  },
+  projectsStatsText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: PROJECT_COLORS.accent,
+  },
+  projectsEmptyState: {
+    alignItems: "center" as const,
+    paddingVertical: S.xl,
+    gap: S.sm,
+  },
+  projectsEmptyText: {
+    color: C.textMuted,
+    fontSize: 14,
+  },
+  projectCard: {
+    flexDirection: RTL_ROW,
+    backgroundColor: PROJECT_COLORS.bg,
+    borderWidth: 1,
+    borderColor: PROJECT_COLORS.border,
+    borderRadius: R.lg,
+    marginBottom: S.md,
+    overflow: "hidden" as const,
+    ...SHADOW.sm,
+    ...(Platform.OS === "web"
+      ? { cursor: "pointer" as any, transition: "all 0.2s ease" }
+      : {}),
+  },
+  projectCardHover: {
+    backgroundColor: PROJECT_COLORS.hover,
+    borderColor: PROJECT_COLORS.accent + "40",
+    transform: [{ translateY: -2 }],
+    ...SHADOW.md,
+  },
+  projectStripe: {
+    width: 5,
+    alignSelf: "stretch" as const,
+  },
+  projectBody: {
+    flex: 1,
+    padding: S.lg,
+    gap: S.xs,
+  },
+  projectTopRow: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    marginBottom: S.xs,
+  },
+  projectStatusChip: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: S.sm + 2,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  projectStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  projectActionBtn: {
+    margin: 0,
+    width: 28,
+    height: 28,
+  },
+  projectTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.textPrimary,
+    textAlign: "right",
+  },
+  projDesc: {
+    fontSize: 13,
+    color: C.textSecondary,
+    textAlign: "right",
+    lineHeight: 19,
+  },
+  projectProgressRow: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    gap: S.sm,
+    marginTop: S.sm,
+  },
+  projectProgressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: PROJECT_COLORS.accent + "15",
+    overflow: "hidden" as const,
+  },
+  projectProgressFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  projectProgressLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    minWidth: 36,
+    textAlign: "left" as const,
+  },
 });
