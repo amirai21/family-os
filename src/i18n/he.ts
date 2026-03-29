@@ -201,6 +201,7 @@ const he = {
     oneTimeEvent: "חד פעמי",
     monthView: "חודש",
     weekView: "שבוע",
+    dayView: "יום",
   },
 
   // ── Project status labels ──
@@ -214,6 +215,7 @@ const he = {
   blockType: {
     school: "בית ספר",
     hobby: "חוג",
+    activity: "חוג",
     other: "אחר",
   },
 

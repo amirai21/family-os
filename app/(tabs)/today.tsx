@@ -9,14 +9,13 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import type { Kid } from "@src/models/kid";
 import type { Note } from "@src/models/note";
 import type { Chore } from "@src/models/chore";
 import type { Project } from "@src/models/project";
-import type { ScheduleBlock, BlockType } from "@src/models/schedule";
+import type { ScheduleBlock } from "@src/models/schedule";
 import type { FamilyEvent, AssigneeType } from "@src/models/familyEvent";
 import { useFamilyStore } from "@src/store/useFamilyStore";
-import { useKidBlocksForDate } from "@src/store/scheduleSelectors";
+import { useAllKidBlocksForDate } from "@src/store/scheduleSelectors";
 import { useTodayFamilyEvents } from "@src/store/familyEventSelectors";
 import { toYMD } from "@src/utils/date";
 import { syncAll } from "@src/lib/sync/syncEngine";
@@ -29,11 +28,10 @@ import { t, LOCALE, blockTypeLabel, assigneeTypeLabel } from "@src/i18n";
 import { minutesToHHMM } from "@src/utils/time";
 import { RTL_ROW } from "@src/ui/rtl";
 import { C, S, R } from "@src/ui/tokens";
+import { formatDateHe } from "@src/components/DatePicker";
 import FamilyBadge from "@src/components/FamilyBadge";
 import PinnedNotesCarousel from "@src/components/PinnedNotesCarousel";
 import ActiveProjectsCarousel from "@src/components/ActiveProjectsCarousel";
-import SummaryCard from "@src/components/SummaryCard";
-import SectionHeader from "@src/components/SectionHeader";
 import NoteModal from "@src/components/NoteModal";
 import FamilyEventModal from "@src/components/FamilyEventModal";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
@@ -44,12 +42,6 @@ import ProjectModal from "@src/components/ProjectModal";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TYPE_COLORS: Record<BlockType, string> = {
-  school: C.purple,
-  hobby: C.red,
-  other: C.teal,
-};
-
 const ASSIGNEE_COLORS: Record<AssigneeType, string> = {
   family: C.teal,
   member: C.purple,
@@ -59,77 +51,17 @@ const ASSIGNEE_COLORS: Record<AssigneeType, string> = {
 const todayDow = new Date().getDay();
 const todayDate = toYMD(new Date());
 
+// Header background — soft sky blue inspired by the reference app
+const HEADER_BG = "#D6ECFA";
+
 // ---------------------------------------------------------------------------
-// KidTodayCard
+// Unified item type for the merged list
 // ---------------------------------------------------------------------------
 
-function KidTodayCard({
-  kid,
-  onBlockPress,
-}: {
-  kid: Kid;
-  onBlockPress: (block: ScheduleBlock) => void;
-}) {
-  const router = useRouter();
-  const blocks = useKidBlocksForDate(kid.id, todayDate, todayDow);
-
-  return (
-    <Card
-      style={[styles.kidCard, { borderTopColor: kid.color }]}
-      mode="elevated"
-    >
-      <Pressable onPress={() => router.push(`/kid/${kid.id}`)}>
-        <View style={styles.kidHeader}>
-          <Text style={styles.kidEmoji}>{kid.emoji}</Text>
-          <View style={styles.kidEmojiSpacer} />
-          <Text style={[styles.kidName, { color: kid.color }]}>
-            {kid.name}
-          </Text>
-          <Text style={[styles.kidArrow, { color: kid.color }]}>‹</Text>
-        </View>
-      </Pressable>
-
-      <View style={styles.kidBody}>
-        {blocks.length === 0 ? (
-          <Text style={styles.noSchedule}>{t("today.noSchedule")}</Text>
-        ) : (
-          blocks.map((block) => {
-            const color = block.color ?? kid.color;
-            const typeColor = TYPE_COLORS[block.type];
-            return (
-              <Pressable
-                key={block.id}
-                style={({ hovered }: any) => [
-                  styles.blockRow,
-                  hovered && styles.blockRowHover,
-                ]}
-                onPress={() => onBlockPress(block)}
-              >
-                <View style={[styles.blockStripe, { backgroundColor: color }]} />
-                <View style={styles.blockInfo}>
-                  <Text style={styles.blockTitle}>{block.title}</Text>
-                  <Text style={styles.blockTime}>
-                    {minutesToHHMM(block.startMinutes)} –{" "}
-                    {minutesToHHMM(block.endMinutes)}
-                    {block.location ? `  ·  ${block.location}` : ""}
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.typeBadge,
-                    { color: typeColor, backgroundColor: typeColor + "18" },
-                  ]}
-                >
-                  {blockTypeLabel(block.type)}
-                </Text>
-              </Pressable>
-            );
-          })
-        )}
-      </View>
-    </Card>
-  );
-}
+type TodayItem =
+  | { kind: "event"; data: FamilyEvent }
+  | { kind: "block"; data: ScheduleBlock }
+  | { kind: "chore"; data: Chore };
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -146,7 +78,6 @@ export default function TodayScreen() {
   const lastSyncedAt = useFamilyStore((s) => s.lastSyncedAt);
 
   const [syncing, setSyncing] = useState(false);
-  const [carouselOpen, setCarouselOpen] = useState(false);
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -155,29 +86,36 @@ export default function TodayScreen() {
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [choreModalOpen, setChoreModalOpen] = useState(false);
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
-  const [hoveredChoreId, setHoveredChoreId] = useState<string | null>(null);
-  const [projectsCarouselOpen, setProjectsCarouselOpen] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const router = useRouter();
 
-  const activeKids = kids.filter((k) => k.isActive);
-
-  const unboughtCount = grocery.filter((g) => !g.isBought).length;
-  const undoneChores = chores.filter((c) => c.selectedForToday && !c.done).length;
-  const activeProjectsList = useMemo(
-    () => projects.filter((p) => p.status === "in_progress"),
-    [projects],
-  );
-  const inProgressProjects = activeProjectsList.length;
   const pinnedNotesList = useMemo(
     () => notes.filter((n) => n.pinned),
     [notes],
   );
-  const pinnedNotes = pinnedNotesList.length;
+  const activeProjectsList = useMemo(
+    () => projects.filter((p) => p.status === "in_progress"),
+    [projects],
+  );
 
   const todayChores = chores.filter((c) => c.selectedForToday);
   const todayEvents = useTodayFamilyEvents(todayDate, todayDow);
+  const allKidBlocks = useAllKidBlocksForDate(todayDate, todayDow);
+
+  // Timed items (events + kid blocks) sorted chronologically
+  const timedItems = useMemo(() => {
+    const items: Array<{ kind: "event"; data: FamilyEvent } | { kind: "block"; data: ScheduleBlock }> = [
+      ...todayEvents.map((e) => ({ kind: "event" as const, data: e })),
+      ...allKidBlocks.map((b) => ({ kind: "block" as const, data: b })),
+    ];
+    items.sort((a, b) => a.data.startMinutes - b.data.startMinutes);
+    return items;
+  }, [todayEvents, allKidBlocks]);
+
+  const hasTimedItems = timedItems.length > 0;
+  const hasChores = todayChores.length > 0;
+  const isEmpty = !hasTimedItems && !hasChores;
 
   const handleSync = async () => {
     setSyncing(true);
@@ -196,143 +134,167 @@ export default function TodayScreen() {
     return d.toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
   };
 
+  // Helper to resolve assignee display for family events
+  const getAssigneeDisplay = (event: FamilyEvent) => {
+    if (event.assigneeType === "member" && event.assigneeId) {
+      const member = familyMembers.find((m) => m.id === event.assigneeId);
+      return member
+        ? `${member.avatarEmoji ?? ""} ${member.name}`
+        : assigneeTypeLabel("member");
+    }
+    if (event.assigneeType === "kid" && event.assigneeId) {
+      const kid = kids.find((k) => k.id === event.assigneeId);
+      return kid ? `${kid.emoji}  ${kid.name}` : assigneeTypeLabel("kid");
+    }
+    return t("today.wholeFamily");
+  };
+
+  // Helper to resolve kid display for schedule blocks
+  const getKidDisplay = (block: ScheduleBlock) => {
+    const kid = kids.find((k) => k.id === block.kidId);
+    return kid ? `${kid.emoji}  ${kid.name}` : "";
+  };
+
+  const getKidColor = (block: ScheduleBlock) => {
+    const kid = kids.find((k) => k.id === block.kidId);
+    return kid?.color ?? C.purple;
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>{t("today.title")}</Text>
         <FamilyBadge />
 
-        {/* ── Overview stats ── */}
-        <Card style={styles.overviewCard} mode="elevated">
-          <View style={styles.statsRow}>
-            <SummaryCard
-              value={unboughtCount}
-              label={t("today.groceryItems")}
-              accentColor={C.red}
-              onPress={() => router.push("/(tabs)/grocery")}
-            />
-            <View style={styles.dividerV} />
-            <SummaryCard
-              value={undoneChores}
-              label={t("today.choresToDo")}
-              accentColor={C.teal}
-            />
+        {/* ── Unified Today Card ── */}
+        <Card style={styles.todayCard} mode="elevated">
+          {/* Date header */}
+          <View style={styles.dateHeader}>
+            <Text style={styles.dateText}>{formatDateHe(todayDate)}</Text>
           </View>
-          <View style={styles.dividerH} />
-          <View style={styles.statsRow}>
-            <SummaryCard
-              value={inProgressProjects}
-              label={t("today.activeProjects")}
-              accentColor={C.purple}
-              onPress={() => setProjectsCarouselOpen((v) => !v)}
-              expanded={projectsCarouselOpen}
-            />
-            <View style={styles.dividerV} />
-            <SummaryCard
-              value={pinnedNotes}
-              label={t("today.pinnedNotes")}
-              accentColor={C.amber}
-              onPress={() => setCarouselOpen((v) => !v)}
-              expanded={carouselOpen}
-            />
-          </View>
-        </Card>
 
-        {/* ── Pinned notes carousel ── */}
-        {carouselOpen && pinnedNotesList.length > 0 && (
-          <PinnedNotesCarousel
-            notes={pinnedNotesList}
-            onNotePress={(note) => {
-              setEditingNote(note);
-              setNoteModalOpen(true);
-            }}
-            onAddPress={() => {
-              setEditingNote(null);
-              setNoteModalOpen(true);
-            }}
-          />
-        )}
-        {carouselOpen && pinnedNotesList.length === 0 && (
-          <Card style={styles.emptyCard} mode="elevated">
-            <Card.Content style={styles.emptyContent}>
-              <Text style={styles.emptyText}>{t("home.noNotes")}</Text>
-              <Button
-                mode="contained"
-                compact
-                onPress={() => {
-                  setEditingNote(null);
-                  setNoteModalOpen(true);
-                }}
-                style={[styles.emptyBtn, { backgroundColor: C.amber }]}
-              >
-                {t("today.addNote")}
-              </Button>
-            </Card.Content>
-          </Card>
-        )}
-
-        {/* ── Active projects carousel ── */}
-        {projectsCarouselOpen && activeProjectsList.length > 0 && (
-          <ActiveProjectsCarousel
-            projects={activeProjectsList}
-            onProjectPress={(project) => {
-              setEditingProject(project);
-              setProjectModalOpen(true);
-            }}
-            onAddPress={() => {
-              setEditingProject(null);
-              setProjectModalOpen(true);
-            }}
-          />
-        )}
-        {projectsCarouselOpen && activeProjectsList.length === 0 && (
-          <Card style={styles.emptyCard} mode="elevated">
-            <Card.Content style={styles.emptyContent}>
-              <Text style={styles.emptyText}>{t("today.noActiveProjects")}</Text>
-              <Button
-                mode="contained"
-                compact
-                onPress={() => {
-                  setEditingProject(null);
-                  setProjectModalOpen(true);
-                }}
-                style={[styles.emptyBtn, { backgroundColor: C.purple }]}
-              >
-                {t("today.addProject")}
-              </Button>
-            </Card.Content>
-          </Card>
-        )}
-
-        {/* ── Today's chores ── */}
-        <SectionHeader label={t("today.todayChores")} />
-        <Card style={styles.card} mode="elevated">
-          <Card.Content>
-            {todayChores.length === 0 ? (
-              <Text style={styles.emptyRowText}>
-                {t("today.noChoresForToday")}
+          {/* Merged item list */}
+          <View style={styles.itemList}>
+            {isEmpty ? (
+              <Text style={styles.emptyText}>
+                {t("today.noEventsForToday")}
               </Text>
             ) : (
-              todayChores.map((chore) => {
+              <>
+                {/* ── Timed events & blocks ── */}
+                {timedItems.map((item) => {
+                  if (item.kind === "event") {
+                    const event = item.data;
+                    const color =
+                      event.color ?? ASSIGNEE_COLORS[event.assigneeType];
+                    return (
+                      <Pressable
+                        key={`event-${event.id}`}
+                        style={({ hovered }: any) => [
+                          styles.itemRow,
+                          hovered && styles.itemRowHover,
+                        ]}
+                        onPress={() => {
+                          setEditingEvent(event);
+                          setEventModalOpen(true);
+                        }}
+                      >
+                        <View
+                          style={[styles.stripe, { backgroundColor: color }]}
+                        />
+                        <View style={styles.itemInfo}>
+                          <Text style={styles.itemTitle}>{event.title}</Text>
+                          <Text style={styles.itemTime}>
+                            {minutesToHHMM(event.startMinutes)} –{" "}
+                            {minutesToHHMM(event.endMinutes)}
+                            {event.location ? `  ·  ${event.location}` : ""}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.badge,
+                            {
+                              color: ASSIGNEE_COLORS[event.assigneeType],
+                              backgroundColor:
+                                ASSIGNEE_COLORS[event.assigneeType] + "18",
+                            },
+                          ]}
+                        >
+                          {getAssigneeDisplay(event)}
+                        </Text>
+                      </Pressable>
+                    );
+                  }
+
+                  const block = item.data;
+                  const kidColor = getKidColor(block);
+                  const stripeColor = block.color ?? kidColor;
+                  return (
+                    <Pressable
+                      key={`block-${block.id}`}
+                      style={({ hovered }: any) => [
+                        styles.itemRow,
+                        hovered && styles.itemRowHover,
+                      ]}
+                      onPress={() => {
+                        setEditingBlock(block);
+                        setBlockModalOpen(true);
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.stripe,
+                          { backgroundColor: stripeColor },
+                        ]}
+                      />
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemTitle}>{block.title}</Text>
+                        <Text style={styles.itemTime}>
+                          {minutesToHHMM(block.startMinutes)} –{" "}
+                          {minutesToHHMM(block.endMinutes)}
+                          {block.location ? `  ·  ${block.location}` : ""}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.badge,
+                          {
+                            color: kidColor,
+                            backgroundColor: kidColor + "18",
+                          },
+                        ]}
+                      >
+                        {getKidDisplay(block)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+
+                {/* ── Chores divider ── */}
+                {hasChores && (
+                  <View style={styles.choresDivider}>
+                    <View style={styles.choresDividerLine} />
+                    <Text style={styles.choresDividerLabel}>
+                      {t("today.todayChores")}
+                    </Text>
+                    <View style={styles.choresDividerLine} />
+                  </View>
+                )}
+
+                {/* ── Chores ── */}
+                {todayChores.map((chore) => {
                 const member = chore.assignedToMemberId
-                  ? familyMembers.find((m) => m.id === chore.assignedToMemberId)
+                  ? familyMembers.find(
+                      (m) => m.id === chore.assignedToMemberId,
+                    )
                   : undefined;
                 const assigneeDisplay = member
                   ? `${member.avatarEmoji ?? ""} ${member.name}`
                   : chore.assignedTo;
                 return (
                   <View
-                    key={chore.id}
-                    style={[
-                      styles.choreRow,
-                      hoveredChoreId === chore.id && styles.rowHover,
-                    ]}
-                    {...(Platform.OS === "web"
-                      ? {
-                          onPointerEnter: () => setHoveredChoreId(chore.id),
-                          onPointerLeave: () => setHoveredChoreId(null),
-                        }
-                      : ({} as any))}
+                    key={`chore-${chore.id}`}
+                    style={styles.choreRow}
                   >
                     <IconButton
                       icon={chore.done ? "check-circle" : "circle-outline"}
@@ -363,94 +325,55 @@ export default function TodayScreen() {
                     </Pressable>
                   </View>
                 );
-              })
+              })}
+              </>
             )}
-          </Card.Content>
+          </View>
         </Card>
 
-        {/* ── Family events ── */}
-        <SectionHeader label={t("today.familyEvents")} />
-        <Card style={styles.card} mode="elevated">
-          <Card.Content>
-            {todayEvents.length === 0 ? (
-              <Text style={styles.emptyRowText}>
-                {t("today.noEventsForToday")}
-              </Text>
-            ) : (
-              todayEvents.map((event) => {
-                const color =
-                  event.color ?? ASSIGNEE_COLORS[event.assigneeType];
-                let assigneeDisplay = t("today.wholeFamily");
-                if (event.assigneeType === "member" && event.assigneeId) {
-                  const member = familyMembers.find(
-                    (m) => m.id === event.assigneeId,
-                  );
-                  assigneeDisplay = member
-                    ? `${member.avatarEmoji ?? ""} ${member.name}`
-                    : assigneeTypeLabel("member");
-                } else if (
-                  event.assigneeType === "kid" &&
-                  event.assigneeId
-                ) {
-                  const kid = kids.find((k) => k.id === event.assigneeId);
-                  assigneeDisplay = kid
-                    ? `${kid.emoji}  ${kid.name}`
-                    : assigneeTypeLabel("kid");
-                }
-                return (
-                  <Pressable
-                    key={event.id}
-                    style={({ hovered }: any) => [
-                      styles.blockRow,
-                      hovered && styles.blockRowHover,
-                    ]}
-                    onPress={() => {
-                      setEditingEvent(event);
-                      setEventModalOpen(true);
-                    }}
-                  >
-                    <View
-                      style={[styles.blockStripe, { backgroundColor: color }]}
-                    />
-                    <View style={styles.blockInfo}>
-                      <Text style={styles.blockTitle}>{event.title}</Text>
-                      <Text style={styles.blockTime}>
-                        {minutesToHHMM(event.startMinutes)} –{" "}
-                        {minutesToHHMM(event.endMinutes)}
-                        {event.location ? `  ·  ${event.location}` : ""}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.typeBadge,
-                        {
-                          color: ASSIGNEE_COLORS[event.assigneeType],
-                          backgroundColor:
-                            ASSIGNEE_COLORS[event.assigneeType] + "18",
-                        },
-                      ]}
-                    >
-                      {assigneeDisplay}
-                    </Text>
-                  </Pressable>
-                );
-              })
-            )}
-          </Card.Content>
-        </Card>
+        {/* ── Pinned notes carousel ── */}
+        {pinnedNotesList.length > 0 && (
+          <>
+            <View style={styles.premiumHeader}>
+              <View style={[styles.premiumAccent, { backgroundColor: C.amber }]} />
+              <Text style={styles.premiumLabel}>{t("today.pinnedNotes")}</Text>
+              <View style={styles.premiumLine} />
+            </View>
+            <PinnedNotesCarousel
+              notes={pinnedNotesList}
+              onNotePress={(note) => {
+                setEditingNote(note);
+                setNoteModalOpen(true);
+              }}
+              onAddPress={() => {
+                setEditingNote(null);
+                setNoteModalOpen(true);
+              }}
+            />
+          </>
+        )}
 
-        {/* ── Kids ── */}
-        <SectionHeader label={t("today.kids")} />
-        {activeKids.map((kid) => (
-          <KidTodayCard
-            key={kid.id}
-            kid={kid}
-            onBlockPress={(block) => {
-              setEditingBlock(block);
-              setBlockModalOpen(true);
-            }}
-          />
-        ))}
+        {/* ── Active projects carousel ── */}
+        {activeProjectsList.length > 0 && (
+          <>
+            <View style={styles.premiumHeader}>
+              <View style={[styles.premiumAccent, { backgroundColor: C.purple }]} />
+              <Text style={styles.premiumLabel}>{t("today.activeProjects")}</Text>
+              <View style={styles.premiumLine} />
+            </View>
+            <ActiveProjectsCarousel
+              projects={activeProjectsList}
+              onProjectPress={(project) => {
+                setEditingProject(project);
+                setProjectModalOpen(true);
+              }}
+              onAddPress={() => {
+                setEditingProject(null);
+                setProjectModalOpen(true);
+              }}
+            />
+          </>
+        )}
 
         {/* ── Sync ── */}
         <View style={styles.syncRow}>
@@ -554,54 +477,126 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
-  // ── Overview card ──────────────────────────────────────────────────────────
-  overviewCard: {
+  // ── Unified Today card ────────────────────────────────────────────────────
+  todayCard: {
     borderRadius: R.lg,
     backgroundColor: C.surface,
     marginBottom: S.xl,
     overflow: "hidden",
   },
-  statsRow: {
+  dateHeader: {
+    backgroundColor: HEADER_BG,
+    paddingHorizontal: S.xl,
+    paddingVertical: S.lg,
+  },
+  dateText: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: C.textPrimary,
+    textAlign: "right",
+  },
+
+  // ── Item list ─────────────────────────────────────────────────────────────
+  itemList: {
+    paddingHorizontal: S.lg,
+    paddingVertical: S.md,
+  },
+  emptyText: {
+    color: C.textMuted,
+    textAlign: "right",
+    fontSize: 14,
+    paddingVertical: S.md,
+  },
+
+  // ── Event / block rows ────────────────────────────────────────────────────
+  itemRow: {
     flexDirection: RTL_ROW,
+    alignItems: "center",
+    paddingVertical: S.md,
+    borderRadius: R.sm,
+    paddingHorizontal: S.xs,
+    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
   },
-  dividerV: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: C.border,
+  itemRowHover: { backgroundColor: C.hoverBg },
+  stripe: {
+    width: 3,
+    borderRadius: 2,
+    alignSelf: "stretch",
+    marginEnd: S.md,
+    marginStart: S.xs,
   },
-  dividerH: {
+  itemInfo: { flex: 1 },
+  itemTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.textPrimary,
+    textAlign: "right",
+  },
+  itemTime: {
+    fontSize: 12,
+    color: C.textSecondary,
+    marginTop: 2,
+    textAlign: "right",
+  },
+  badge: {
+    fontSize: 10,
+    fontWeight: "600",
+    paddingHorizontal: S.sm,
+    paddingVertical: 3,
+    borderRadius: R.sm,
+    overflow: "hidden",
+    marginStart: S.sm,
+  },
+
+  // ── Premium section headers ─────────────────────────────────────────────────
+  premiumHeader: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    marginTop: S.xl,
+    marginBottom: S.md,
+    paddingHorizontal: S.xs,
+  },
+  premiumAccent: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+    marginEnd: S.sm,
+  },
+  premiumLabel: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.textPrimary,
+    letterSpacing: 0.3,
+    textAlign: "right",
+    marginHorizontal: S.md,
+  },
+  premiumLine: {
+    flex: 1,
     height: StyleSheet.hairlineWidth,
     backgroundColor: C.border,
   },
 
-  // ── Shared card ───────────────────────────────────────────────────────────
-  card: {
-    borderRadius: R.lg,
-    backgroundColor: C.surface,
-    marginBottom: S.lg,
+  // ── Chores divider ─────────────────────────────────────────────────────────
+  choresDivider: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    marginTop: S.md,
+    marginBottom: S.xs,
+    paddingHorizontal: S.xs,
+  },
+  choresDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: C.border,
+  },
+  choresDividerLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.textMuted,
+    paddingHorizontal: S.md,
   },
 
-  // ── Empty states ──────────────────────────────────────────────────────────
-  emptyCard: {
-    borderRadius: R.lg,
-    backgroundColor: C.surface,
-    marginBottom: S.lg,
-  },
-  emptyContent: { alignItems: "center", paddingVertical: S.lg },
-  emptyText: {
-    color: C.textMuted,
-    textAlign: "center",
-    marginBottom: S.md,
-    fontSize: 14,
-  },
-  emptyBtn: { borderRadius: R.md },
-  emptyRowText: {
-    color: C.textMuted,
-    textAlign: "right",
-    fontSize: 14,
-    paddingVertical: S.xs,
-  },
-
-  // ── Chore rows ─────────────────────────────────────────────────────────────
+  // ── Chore rows ────────────────────────────────────────────────────────────
   choreRow: {
     flexDirection: RTL_ROW,
     alignItems: "center",
@@ -609,7 +604,6 @@ const styles = StyleSheet.create({
     borderRadius: R.sm,
     paddingHorizontal: S.xs,
   },
-  rowHover: { backgroundColor: C.hoverBg },
   choreCheck: { margin: 0 },
   choreTextWrap: { flex: 1, marginStart: S.xs },
   choreTitle: {
@@ -630,84 +624,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // ── Block / event rows ────────────────────────────────────────────────────
-  blockRow: {
-    flexDirection: RTL_ROW,
-    alignItems: "center",
-    paddingVertical: S.md,
-    borderRadius: R.sm,
-    paddingHorizontal: S.xs,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
-  },
-  blockRowHover: { backgroundColor: C.hoverBg },
-  blockStripe: {
-    width: 3,
-    borderRadius: 2,
-    alignSelf: "stretch",
-    marginEnd: S.md,
-    marginStart: S.xs,
-  },
-  blockInfo: { flex: 1 },
-  blockTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: C.textPrimary,
-    textAlign: "right",
-  },
-  blockTime: {
-    fontSize: 12,
-    color: C.textSecondary,
-    marginTop: 2,
-    textAlign: "right",
-  },
-  typeBadge: {
-    fontSize: 10,
-    fontWeight: "600",
-    paddingHorizontal: S.sm,
-    paddingVertical: 3,
-    borderRadius: R.sm,
-    overflow: "hidden",
-    marginStart: S.sm,
-  },
-
-  // ── Kid cards ─────────────────────────────────────────────────────────────
-  kidCard: {
-    borderRadius: R.lg,
-    backgroundColor: C.surface,
-    marginBottom: S.md,
-    borderTopWidth: 2,
-    overflow: "hidden",
-  },
-  kidHeader: {
-    flexDirection: RTL_ROW,
-    alignItems: "center",
-    paddingHorizontal: S.lg,
-    paddingVertical: S.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.border,
-  },
-  kidEmoji: { fontSize: 20 },
-  kidEmojiSpacer: { width: S.sm },
-  kidName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "700",
-    textAlign: "right",
-  },
-  kidArrow: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: C.textMuted,
-  },
-  kidBody: { paddingHorizontal: S.lg, paddingBottom: S.md },
-  noSchedule: {
-    color: C.textMuted,
-    textAlign: "right",
-    paddingVertical: S.sm,
-    fontSize: 13,
-  },
-
-  // ── Sync footer ───────────────────────────────────────────────────────────
+  // ── Sync footer ─────────────────────────────────────────────────────────
   syncRow: {
     flexDirection: RTL_ROW,
     alignItems: "center",

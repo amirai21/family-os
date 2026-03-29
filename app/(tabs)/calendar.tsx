@@ -5,7 +5,7 @@
  * FAB to add new family events.
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import {
   Card,
@@ -45,6 +45,7 @@ import { TYPE_COLORS, ASSIGNEE_COLORS } from "@src/ui/semanticColors";
 
 import MonthCalendar from "@src/components/Calendar/MonthCalendar";
 import WeekCalendar from "@src/components/Calendar/WeekCalendar";
+import DayCalendar from "@src/components/Calendar/DayCalendar";
 import FamilyEventModal from "@src/components/FamilyEventModal";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
 import FamilyBadge from "@src/components/FamilyBadge";
@@ -127,7 +128,7 @@ function KidBlockRow({
   const kids = useFamilyStore((s) => s.kids);
   const kid = kids.find((k) => k.id === block.kidId);
   const color = block.color ?? kid?.color ?? C.red;
-  const typeColor = TYPE_COLORS[block.type];
+  const typeColor = TYPE_COLORS[block.type] ?? C.red;
 
   return (
     <Pressable style={styles.eventRow} onPress={onEdit}>
@@ -172,7 +173,7 @@ function KidBlockRow({
 // Screen
 // ---------------------------------------------------------------------------
 
-type CalendarView = "month" | "week";
+type CalendarView = "month" | "week" | "day";
 
 export default function CalendarScreen() {
   const [calendarView, setCalendarView] = useState<CalendarView>("month");
@@ -230,6 +231,26 @@ export default function CalendarScreen() {
     }
   };
 
+  const handleGridEventPress = useCallback((id: string, source: "event" | "block") => {
+    if (source === "event") {
+      const event = dayEvents.find((e) => e.id === id)
+        ?? oneTimeEvents.find((e) => e.id === id)
+        ?? [...Array(7)].reduce<FamilyEvent | undefined>(
+          (found, _, dow) => found ?? recurringByDay[dow]?.find((e) => e.id === id),
+          undefined,
+        );
+      if (event) openEdit(event);
+    } else {
+      const block = dayBlocks.find((b) => b.id === id)
+        ?? kidOneTimeBlocks.find((b) => b.id === id)
+        ?? [...Array(7)].reduce<ScheduleBlock | undefined>(
+          (found, _, dow) => found ?? kidRecurringByDay[dow]?.find((b) => b.id === id),
+          undefined,
+        );
+      if (block) openEditBlock(block);
+    }
+  }, [dayEvents, dayBlocks, oneTimeEvents, kidOneTimeBlocks, recurringByDay, kidRecurringByDay]);
+
   const hasAnyItems = dayEvents.length > 0 || dayBlocks.length > 0;
 
   // Build markedDates
@@ -265,28 +286,40 @@ export default function CalendarScreen() {
           value={calendarView}
           onValueChange={(v) => setCalendarView(v as CalendarView)}
           buttons={[
-            { value: "month", label: t("calendar.monthView") },
-            { value: "week", label: t("calendar.weekView") },
+            { value: "month", label: t("calendar.monthView"), checkedColor: "#1A6DB0", uncheckedColor: C.textSecondary },
+            { value: "week", label: t("calendar.weekView"), checkedColor: "#1A6DB0", uncheckedColor: C.textSecondary },
+            { value: "day", label: t("calendar.dayView"), checkedColor: "#1A6DB0", uncheckedColor: C.textSecondary },
           ]}
           style={styles.viewToggle}
+          theme={{ colors: { secondaryContainer: "#D6ECFA", onSecondaryContainer: "#1A6DB0" } }}
         />
 
         {/* Calendar */}
         <Card style={styles.card} mode="elevated">
           <Card.Content>
-            {calendarView === "month" ? (
+            {calendarView === "month" && (
               <MonthCalendar
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
                 markedDates={markedDates}
                 accentColor={C.purple}
               />
-            ) : (
+            )}
+            {calendarView === "week" && (
               <WeekCalendar
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
                 markedDates={markedDates}
                 accentColor={C.purple}
+                onEventPress={handleGridEventPress}
+              />
+            )}
+            {calendarView === "day" && (
+              <DayCalendar
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                accentColor={C.purple}
+                onEventPress={handleGridEventPress}
               />
             )}
           </Card.Content>
