@@ -302,7 +302,7 @@ export function deleteProjectRemote(id: string) {
 
 export function addScheduleBlockRemote(input: {
   kidId: string;
-  dayOfWeek: number;
+  daysOfWeek: number[];
   title: string;
   type: BlockType;
   startMinutes: number;
@@ -327,7 +327,7 @@ export function updateScheduleBlockRemote(
   patch: Partial<
     Pick<
       ScheduleBlock,
-      "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
+      "daysOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
     >
   >,
 ) {
@@ -455,7 +455,7 @@ export function addFamilyEventRemote(input: {
   title: string;
   assigneeType: AssigneeType;
   assigneeId?: string;
-  dayOfWeek: number;
+  daysOfWeek: number[];
   startMinutes: number;
   endMinutes: number;
   location?: string;
@@ -478,7 +478,7 @@ export function updateFamilyEventRemote(
   patch: Partial<
     Pick<
       FamilyEvent,
-      "title" | "assigneeType" | "assigneeId" | "dayOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
+      "title" | "assigneeType" | "assigneeId" | "daysOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
     >
   >,
 ) {

@@ -163,10 +163,17 @@ export function localToApiKid(item: Kid) {
 // ---------------------------------------------------------------------------
 
 export function apiToLocalScheduleBlock(a: ApiScheduleBlock): ScheduleBlock {
+  // Handle both old API (dayOfWeek: number) and new API (daysOfWeek: number[])
+  const raw = (a as any);
+  const daysOfWeek = Array.isArray(raw.daysOfWeek)
+    ? raw.daysOfWeek
+    : typeof raw.dayOfWeek === "number"
+      ? [raw.dayOfWeek]
+      : [0];
   return {
     id: a.id,
     kidId: a.kidId,
-    dayOfWeek: a.dayOfWeek,
+    daysOfWeek,
     title: a.title,
     type: a.type,
     startMinutes: a.startMinutes,
@@ -185,7 +192,7 @@ export function localToApiScheduleBlock(item: ScheduleBlock) {
   return {
     id: item.id,
     kidId: item.kidId,
-    dayOfWeek: item.dayOfWeek,
+    daysOfWeek: item.daysOfWeek,
     title: item.title,
     type: item.type,
     startMinutes: item.startMinutes,
@@ -234,12 +241,19 @@ export function localToApiFamilyMember(item: FamilyMember) {
 // ---------------------------------------------------------------------------
 
 export function apiToLocalFamilyEvent(a: ApiFamilyEvent): FamilyEvent {
+  // Handle both old API (dayOfWeek: number) and new API (daysOfWeek: number[])
+  const raw = (a as any);
+  const daysOfWeek = Array.isArray(raw.daysOfWeek)
+    ? raw.daysOfWeek
+    : typeof raw.dayOfWeek === "number"
+      ? [raw.dayOfWeek]
+      : [0];
   return {
     id: a.id,
     title: a.title,
     assigneeType: a.assigneeType as AssigneeType,
     assigneeId: a.assigneeId ?? undefined,
-    dayOfWeek: a.dayOfWeek,
+    daysOfWeek,
     startMinutes: a.startMinutes,
     endMinutes: a.endMinutes,
     location: a.location ?? undefined,
@@ -258,7 +272,7 @@ export function localToApiFamilyEvent(item: FamilyEvent) {
     title: item.title,
     assigneeType: item.assigneeType,
     assigneeId: item.assigneeId ?? null,
-    dayOfWeek: item.dayOfWeek,
+    daysOfWeek: item.daysOfWeek,
     startMinutes: item.startMinutes,
     endMinutes: item.endMinutes,
     location: item.location ?? null,

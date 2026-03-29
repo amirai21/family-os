@@ -31,7 +31,7 @@ interface ReminderSource {
   title: string;
   startMinutes: number;
   isRecurring: boolean;
-  dayOfWeek: number;
+  daysOfWeek: number[];
   date: string | null;
   reminders: string | null;
 }
@@ -83,7 +83,7 @@ export async function checkAndSendReminders(): Promise<{
       title: e.title,
       startMinutes: e.startMinutes,
       isRecurring: e.isRecurring,
-      dayOfWeek: e.dayOfWeek,
+      daysOfWeek: e.daysOfWeek,
       date: e.date,
       reminders: e.reminders,
     })),
@@ -93,7 +93,7 @@ export async function checkAndSendReminders(): Promise<{
       title: b.title,
       startMinutes: b.startMinutes,
       isRecurring: b.isRecurring,
-      dayOfWeek: b.dayOfWeek,
+      daysOfWeek: b.daysOfWeek,
       date: b.date,
       reminders: b.reminders,
     })),
@@ -177,12 +177,12 @@ export async function checkAndSendReminders(): Promise<{
 // ---------------------------------------------------------------------------
 
 function getEventDateForToday(
-  event: { isRecurring: boolean; dayOfWeek: number; date: string | null },
+  event: { isRecurring: boolean; daysOfWeek: number[]; date: string | null },
   currentDow: number,
   todayYMD: string,
 ): string | null {
   if (event.isRecurring) {
-    return event.dayOfWeek === currentDow ? todayYMD : null;
+    return event.daysOfWeek.includes(currentDow) ? todayYMD : null;
   } else {
     return event.date === todayYMD ? todayYMD : null;
   }

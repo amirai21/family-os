@@ -84,7 +84,7 @@ export interface ApiScheduleBlock {
   id: string;
   familyId: string;
   kidId: string;
-  dayOfWeek: number;
+  daysOfWeek: number[];
   title: string;
   type: "school" | "hobby" | "other";
   startMinutes: number;
@@ -104,7 +104,7 @@ export interface ApiFamilyEvent {
   title: string;
   assigneeType: "member" | "kid" | "family";
   assigneeId: string | null;
-  dayOfWeek: number;
+  daysOfWeek: number[];
   startMinutes: number;
   endMinutes: number;
   location: string | null;

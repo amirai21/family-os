@@ -95,29 +95,29 @@ async function main() {
   // Sun=0 Mon=1 Tue=2 Wed=3 Thu=4 Fri=5 Sat=6
   await db.insert(scheduleBlocks).values([
     // Noa — school Sun–Thu, ballet Wed
-    { familyId, kidId: noa.id, dayOfWeek: 0, title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, dayOfWeek: 1, title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, dayOfWeek: 2, title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, dayOfWeek: 3, title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, dayOfWeek: 4, title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, dayOfWeek: 3, title: "בלט", type: "hobby", startMinutes: t("16:00"), endMinutes: t("17:30"), location: "אולפן ריקוד", color: "#FF6B6B", isRecurring: true },
+    { familyId, kidId: noa.id, daysOfWeek: [0], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
+    { familyId, kidId: noa.id, daysOfWeek: [1], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
+    { familyId, kidId: noa.id, daysOfWeek: [2], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
+    { familyId, kidId: noa.id, daysOfWeek: [3], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
+    { familyId, kidId: noa.id, daysOfWeek: [4], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
+    { familyId, kidId: noa.id, daysOfWeek: [3], title: "בלט", type: "hobby", startMinutes: t("16:00"), endMinutes: t("17:30"), location: "אולפן ריקוד", color: "#FF6B6B", isRecurring: true },
 
     // Ido — school Sun–Thu, football Tue+Thu
-    { familyId, kidId: ido.id, dayOfWeek: 0, title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, dayOfWeek: 1, title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, dayOfWeek: 2, title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, dayOfWeek: 3, title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, dayOfWeek: 4, title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, dayOfWeek: 2, title: "כדורגל", type: "hobby", startMinutes: t("17:00"), endMinutes: t("18:30"), location: "מגרש ספורט", color: "#4ECDC4", isRecurring: true },
-    { familyId, kidId: ido.id, dayOfWeek: 4, title: "כדורגל", type: "hobby", startMinutes: t("17:00"), endMinutes: t("18:30"), location: "מגרש ספורט", color: "#4ECDC4", isRecurring: true },
+    { familyId, kidId: ido.id, daysOfWeek: [0], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
+    { familyId, kidId: ido.id, daysOfWeek: [1], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
+    { familyId, kidId: ido.id, daysOfWeek: [2], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
+    { familyId, kidId: ido.id, daysOfWeek: [3], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
+    { familyId, kidId: ido.id, daysOfWeek: [4], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
+    { familyId, kidId: ido.id, daysOfWeek: [2], title: "כדורגל", type: "hobby", startMinutes: t("17:00"), endMinutes: t("18:30"), location: "מגרש ספורט", color: "#4ECDC4", isRecurring: true },
+    { familyId, kidId: ido.id, daysOfWeek: [4], title: "כדורגל", type: "hobby", startMinutes: t("17:00"), endMinutes: t("18:30"), location: "מגרש ספורט", color: "#4ECDC4", isRecurring: true },
 
     // Yael — kindergarten Sun–Thu, swimming Mon
-    { familyId, kidId: yael.id, dayOfWeek: 0, title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, dayOfWeek: 1, title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, dayOfWeek: 2, title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, dayOfWeek: 3, title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, dayOfWeek: 4, title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, dayOfWeek: 1, title: "שחייה", type: "hobby", startMinutes: t("16:30"), endMinutes: t("17:30"), location: "בריכה עירונית", color: "#FFA726", isRecurring: true },
+    { familyId, kidId: yael.id, daysOfWeek: [0], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
+    { familyId, kidId: yael.id, daysOfWeek: [1], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
+    { familyId, kidId: yael.id, daysOfWeek: [2], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
+    { familyId, kidId: yael.id, daysOfWeek: [3], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
+    { familyId, kidId: yael.id, daysOfWeek: [4], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
+    { familyId, kidId: yael.id, daysOfWeek: [1], title: "שחייה", type: "hobby", startMinutes: t("16:30"), endMinutes: t("17:30"), location: "בריכה עירונית", color: "#FFA726", isRecurring: true },
   ]);
 
   console.log(`  📅  Schedule blocks inserted`);
@@ -191,43 +191,43 @@ async function main() {
   // ── Family events ─────────────────────────────────────────────────────────
   await db.insert(familyEvents).values([
     // Recurring weekly
-    { familyId, title: "ארוחת שבת משפחתית", assigneeType: "family", dayOfWeek: 5, startMinutes: t("19:00"), endMinutes: t("21:00"), location: "בית סבא וסבתא", color: "#FFD700", isRecurring: true },
-    { familyId, title: "ספורט בוקר — אבא", assigneeType: "member", assigneeId: dad.id, dayOfWeek: 0, startMinutes: t("06:30"), endMinutes: t("07:30"), location: "חדר כושר", color: "#6C63FF", isRecurring: true },
-    { familyId, title: "יוגה — אמא", assigneeType: "member", assigneeId: mom.id, dayOfWeek: 2, startMinutes: t("09:00"), endMinutes: t("10:00"), location: "סטודיו יוגה", color: "#FF6B6B", isRecurring: true },
-    { familyId, title: "שיעור פרטי בחשבון — נועה", assigneeType: "kid", assigneeId: noa.id, dayOfWeek: 1, startMinutes: t("16:00"), endMinutes: t("17:00"), color: "#FF6B6B", isRecurring: true },
-    { familyId, title: "ערב הורים + ילדים", assigneeType: "family", dayOfWeek: 4, startMinutes: t("19:30"), endMinutes: t("21:00"), location: "בית", color: "#4ECDC4", isRecurring: true },
+    { familyId, title: "ארוחת שבת משפחתית", assigneeType: "family", daysOfWeek: [5], startMinutes: t("19:00"), endMinutes: t("21:00"), location: "בית סבא וסבתא", color: "#FFD700", isRecurring: true },
+    { familyId, title: "ספורט בוקר — אבא", assigneeType: "member", assigneeId: dad.id, daysOfWeek: [0], startMinutes: t("06:30"), endMinutes: t("07:30"), location: "חדר כושר", color: "#6C63FF", isRecurring: true },
+    { familyId, title: "יוגה — אמא", assigneeType: "member", assigneeId: mom.id, daysOfWeek: [2], startMinutes: t("09:00"), endMinutes: t("10:00"), location: "סטודיו יוגה", color: "#FF6B6B", isRecurring: true },
+    { familyId, title: "שיעור פרטי בחשבון — נועה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [1], startMinutes: t("16:00"), endMinutes: t("17:00"), color: "#FF6B6B", isRecurring: true },
+    { familyId, title: "ערב הורים + ילדים", assigneeType: "family", daysOfWeek: [4], startMinutes: t("19:30"), endMinutes: t("21:00"), location: "בית", color: "#4ECDC4", isRecurring: true },
     // One-time upcoming (existing)
-    { familyId, title: "ביקור רופא — עידו", assigneeType: "kid", assigneeId: ido.id, dayOfWeek: 0, startMinutes: t("17:00"), endMinutes: t("17:45"), location: "קופת חולים", color: "#4ECDC4", isRecurring: false, date: "2026-03-22" },
-    { familyId, title: "פגישת הורים — בית ספר", assigneeType: "family", dayOfWeek: 2, startMinutes: t("18:00"), endMinutes: t("19:30"), location: "בית ספר רמות", color: "#FFD700", isRecurring: false, date: "2026-03-25" },
-    { familyId, title: "יום הולדת — סבתא חנה", assigneeType: "family", dayOfWeek: 6, startMinutes: t("12:00"), endMinutes: t("16:00"), location: "בית סבתא", color: "#FF6B6B", isRecurring: false, date: "2026-03-28" },
+    { familyId, title: "ביקור רופא — עידו", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [0], startMinutes: t("17:00"), endMinutes: t("17:45"), location: "קופת חולים", color: "#4ECDC4", isRecurring: false, date: "2026-03-22" },
+    { familyId, title: "פגישת הורים — בית ספר", assigneeType: "family", daysOfWeek: [2], startMinutes: t("18:00"), endMinutes: t("19:30"), location: "בית ספר רמות", color: "#FFD700", isRecurring: false, date: "2026-03-25" },
+    { familyId, title: "יום הולדת — סבתא חנה", assigneeType: "family", daysOfWeek: [6], startMinutes: t("12:00"), endMinutes: t("16:00"), location: "בית סבתא", color: "#FF6B6B", isRecurring: false, date: "2026-03-28" },
   ]);
 
   // ── Standalone one-time events — next 3 weeks ─────────────────────────────
   await db.insert(familyEvents).values([
     // --- נועה ---
-    { familyId, title: "בדיקת עיניים — נועה", assigneeType: "kid", assigneeId: noa.id, dayOfWeek: 4, startMinutes: t("15:30"), endMinutes: t("16:15"), location: "קופת חולים", color: "#FF6B6B", isRecurring: false, date: "2026-03-19" },
-    { familyId, title: "מסיבת יום הולדת — חברה של נועה", assigneeType: "kid", assigneeId: noa.id, dayOfWeek: 4, startMinutes: t("16:00"), endMinutes: t("18:30"), location: "אולם אירועים", color: "#FF6B6B", isRecurring: false, date: "2026-03-26" },
-    { familyId, title: "טיול שנתי — בית ספר", assigneeType: "kid", assigneeId: noa.id, dayOfWeek: 5, startMinutes: t("07:30"), endMinutes: t("15:00"), location: "נחל אלכסנדר", color: "#FF6B6B", isRecurring: false, date: "2026-04-03" },
-    { familyId, title: "הצגת ילדים — תאטרון הבימה", assigneeType: "kid", assigneeId: noa.id, dayOfWeek: 2, startMinutes: t("18:00"), endMinutes: t("19:30"), location: "תאטרון הבימה", color: "#FF6B6B", isRecurring: false, date: "2026-04-07" },
+    { familyId, title: "בדיקת עיניים — נועה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [4], startMinutes: t("15:30"), endMinutes: t("16:15"), location: "קופת חולים", color: "#FF6B6B", isRecurring: false, date: "2026-03-19" },
+    { familyId, title: "מסיבת יום הולדת — חברה של נועה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [4], startMinutes: t("16:00"), endMinutes: t("18:30"), location: "אולם אירועים", color: "#FF6B6B", isRecurring: false, date: "2026-03-26" },
+    { familyId, title: "טיול שנתי — בית ספר", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [5], startMinutes: t("07:30"), endMinutes: t("15:00"), location: "נחל אלכסנדר", color: "#FF6B6B", isRecurring: false, date: "2026-04-03" },
+    { familyId, title: "הצגת ילדים — תאטרון הבימה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [2], startMinutes: t("18:00"), endMinutes: t("19:30"), location: "תאטרון הבימה", color: "#FF6B6B", isRecurring: false, date: "2026-04-07" },
 
     // --- עידו ---
-    { familyId, title: "גמר כדורגל עירוני", assigneeType: "kid", assigneeId: ido.id, dayOfWeek: 5, startMinutes: t("10:00"), endMinutes: t("11:30"), location: "מגרש ספורט אזורי", color: "#4ECDC4", isRecurring: false, date: "2026-03-20" },
-    { familyId, title: "🎉 יום הולדת עידו!", assigneeType: "kid", assigneeId: ido.id, dayOfWeek: 2, startMinutes: t("17:00"), endMinutes: t("20:00"), location: "בית", color: "#4ECDC4", isRecurring: false, date: "2026-03-31" },
-    { familyId, title: "רופא שיניים — עידו", assigneeType: "kid", assigneeId: ido.id, dayOfWeek: 4, startMinutes: t("15:00"), endMinutes: t("15:45"), location: "קליניקת שיניים", color: "#4ECDC4", isRecurring: false, date: "2026-04-02" },
-    { familyId, title: "מפגש עם ירדן", assigneeType: "kid", assigneeId: ido.id, dayOfWeek: 1, startMinutes: t("16:00"), endMinutes: t("18:00"), color: "#4ECDC4", isRecurring: false, date: "2026-04-06" },
+    { familyId, title: "גמר כדורגל עירוני", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [5], startMinutes: t("10:00"), endMinutes: t("11:30"), location: "מגרש ספורט אזורי", color: "#4ECDC4", isRecurring: false, date: "2026-03-20" },
+    { familyId, title: "🎉 יום הולדת עידו!", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [2], startMinutes: t("17:00"), endMinutes: t("20:00"), location: "בית", color: "#4ECDC4", isRecurring: false, date: "2026-03-31" },
+    { familyId, title: "רופא שיניים — עידו", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [4], startMinutes: t("15:00"), endMinutes: t("15:45"), location: "קליניקת שיניים", color: "#4ECDC4", isRecurring: false, date: "2026-04-02" },
+    { familyId, title: "מפגש עם ירדן", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [1], startMinutes: t("16:00"), endMinutes: t("18:00"), color: "#4ECDC4", isRecurring: false, date: "2026-04-06" },
 
     // --- יעל ---
-    { familyId, title: "בדיקת שמיעה — יעל", assigneeType: "kid", assigneeId: yael.id, dayOfWeek: 3, startMinutes: t("09:30"), endMinutes: t("10:15"), location: "קופת חולים", color: "#FFA726", isRecurring: false, date: "2026-03-18" },
-    { familyId, title: "יום גיבורים בגן — יעל", assigneeType: "kid", assigneeId: yael.id, dayOfWeek: 2, startMinutes: t("09:00"), endMinutes: t("11:30"), color: "#FFA726", isRecurring: false, date: "2026-03-24" },
-    { familyId, title: "טיול גן — מוזיאון ילדים", assigneeType: "kid", assigneeId: yael.id, dayOfWeek: 3, startMinutes: t("09:30"), endMinutes: t("13:00"), location: "מוזיאון ילדים", color: "#FFA726", isRecurring: false, date: "2026-04-01" },
-    { familyId, title: "יום כיף בפארק — יעל", assigneeType: "kid", assigneeId: yael.id, dayOfWeek: 0, startMinutes: t("10:00"), endMinutes: t("13:00"), location: "פארק הירקון", color: "#FFA726", isRecurring: false, date: "2026-04-05" },
+    { familyId, title: "בדיקת שמיעה — יעל", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [3], startMinutes: t("09:30"), endMinutes: t("10:15"), location: "קופת חולים", color: "#FFA726", isRecurring: false, date: "2026-03-18" },
+    { familyId, title: "יום גיבורים בגן — יעל", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [2], startMinutes: t("09:00"), endMinutes: t("11:30"), color: "#FFA726", isRecurring: false, date: "2026-03-24" },
+    { familyId, title: "טיול גן — מוזיאון ילדים", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [3], startMinutes: t("09:30"), endMinutes: t("13:00"), location: "מוזיאון ילדים", color: "#FFA726", isRecurring: false, date: "2026-04-01" },
+    { familyId, title: "יום כיף בפארק — יעל", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [0], startMinutes: t("10:00"), endMinutes: t("13:00"), location: "פארק הירקון", color: "#FFA726", isRecurring: false, date: "2026-04-05" },
 
     // --- כל המשפחה ---
-    { familyId, title: "פיקניק משפחתי", assigneeType: "family", dayOfWeek: 5, startMinutes: t("11:00"), endMinutes: t("14:00"), location: "פארק הירקון", color: "#FFD700", isRecurring: false, date: "2026-03-20" },
-    { familyId, title: "ביקור אצל סבא וסבתא", assigneeType: "family", dayOfWeek: 1, startMinutes: t("18:00"), endMinutes: t("21:00"), location: "בית סבא", color: "#FFD700", isRecurring: false, date: "2026-03-23" },
-    { familyId, title: "ערב סרטים משפחתי", assigneeType: "family", dayOfWeek: 5, startMinutes: t("20:00"), endMinutes: t("22:00"), location: "בית", color: "#6C63FF", isRecurring: false, date: "2026-03-27" },
-    { familyId, title: "שוק איכרים", assigneeType: "family", dayOfWeek: 5, startMinutes: t("09:00"), endMinutes: t("11:00"), location: "שוק הכרמל", color: "#FFD700", isRecurring: false, date: "2026-04-03" },
-    { familyId, title: "ביקור בגן החיות", assigneeType: "family", dayOfWeek: 0, startMinutes: t("09:30"), endMinutes: t("14:00"), location: "גן חיות ירושלים", color: "#4ECDC4", isRecurring: false, date: "2026-04-05" },
+    { familyId, title: "פיקניק משפחתי", assigneeType: "family", daysOfWeek: [5], startMinutes: t("11:00"), endMinutes: t("14:00"), location: "פארק הירקון", color: "#FFD700", isRecurring: false, date: "2026-03-20" },
+    { familyId, title: "ביקור אצל סבא וסבתא", assigneeType: "family", daysOfWeek: [1], startMinutes: t("18:00"), endMinutes: t("21:00"), location: "בית סבא", color: "#FFD700", isRecurring: false, date: "2026-03-23" },
+    { familyId, title: "ערב סרטים משפחתי", assigneeType: "family", daysOfWeek: [5], startMinutes: t("20:00"), endMinutes: t("22:00"), location: "בית", color: "#6C63FF", isRecurring: false, date: "2026-03-27" },
+    { familyId, title: "שוק איכרים", assigneeType: "family", daysOfWeek: [5], startMinutes: t("09:00"), endMinutes: t("11:00"), location: "שוק הכרמל", color: "#FFD700", isRecurring: false, date: "2026-04-03" },
+    { familyId, title: "ביקור בגן החיות", assigneeType: "family", daysOfWeek: [0], startMinutes: t("09:30"), endMinutes: t("14:00"), location: "גן חיות ירושלים", color: "#4ECDC4", isRecurring: false, date: "2026-04-05" },
   ]);
 
   console.log(`  📆  Family events inserted`);

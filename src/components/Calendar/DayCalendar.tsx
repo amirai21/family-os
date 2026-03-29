@@ -28,6 +28,7 @@ interface Props {
   onSelectDate: (date: string) => void;
   accentColor?: string;
   onEventPress?: (id: string, source: "event" | "block") => void;
+  onSlotPress?: (date: string, startMinutes: number, endMinutes: number) => void;
 }
 
 interface EventItem {
@@ -139,11 +140,14 @@ function layoutEvents(events: EventItem[]): LayoutedEvent[] {
 // Component
 // ---------------------------------------------------------------------------
 
+const SLOT_HEIGHT = HOUR_HEIGHT / 2;
+
 export default function DayCalendar({
   selectedDate,
   onSelectDate,
   accentColor = DEFAULT_ACCENT,
   onEventPress,
+  onSlotPress,
 }: Props) {
   const selectedDow = dayOfWeekFromYMD(selectedDate);
   const familyEvents = useFamilyEventsForDate(selectedDate, selectedDow);
@@ -240,6 +244,22 @@ export default function DayCalendar({
           <View style={styles.dayColumnContainer}>
             <View style={styles.timeLabelSpacer} />
             <View style={styles.dayColumn}>
+              {/* Clickable half-hour slot overlays */}
+              {onSlotPress && Array.from({ length: (GRID_END_HOUR - GRID_START_HOUR) * 2 }, (_, si) => {
+                const slotStart = (GRID_START_HOUR * 60) + (si * 30);
+                const slotEnd = slotStart + 60;
+                return (
+                  <Pressable
+                    key={`slot-${si}`}
+                    style={({ hovered }: any) => [
+                      styles.timeSlot,
+                      { top: si * SLOT_HEIGHT, height: SLOT_HEIGHT },
+                      hovered && styles.timeSlotHover,
+                    ]}
+                    onPress={() => onSlotPress(selectedDate, slotStart, Math.min(slotEnd, GRID_END_HOUR * 60))}
+                  />
+                );
+              })}
               {dayItems.map((ev) => {
                 const clampedStart = Math.max(ev.startMinutes, GRID_START_HOUR * 60);
                 const clampedEnd = Math.min(ev.endMinutes, GRID_END_HOUR * 60);
@@ -361,6 +381,17 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
+  timeSlot: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 0,
+    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
+  },
+  timeSlotHover: {
+    backgroundColor: "rgba(108, 99, 255, 0.06)",
+  },
+
   eventBlock: {
     position: "absolute",
     borderLeftWidth: 4,
@@ -369,6 +400,7 @@ const styles = StyleSheet.create({
     paddingVertical: S.xs,
     overflow: "hidden",
     marginRight: 2,
+    zIndex: 1,
     ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
   },
   eventRow: {

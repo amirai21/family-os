@@ -198,10 +198,24 @@ export default function CalendarScreen() {
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
 
+  // Pre-filled time for slot-click creation
+  const [slotStartTime, setSlotStartTime] = useState<string | undefined>();
+  const [slotEndTime, setSlotEndTime] = useState<string | undefined>();
+
   const openAdd = () => {
+    setSlotStartTime(undefined);
+    setSlotEndTime(undefined);
     setEditingEvent(null);
     setModalOpen(true);
   };
+
+  const handleSlotPress = useCallback((date: string, startMinutes: number, endMinutes: number) => {
+    setSelectedDate(date);
+    setSlotStartTime(minutesToHHMM(startMinutes));
+    setSlotEndTime(minutesToHHMM(endMinutes));
+    setEditingEvent(null);
+    setModalOpen(true);
+  }, []);
 
   const openEdit = (event: FamilyEvent) => {
     setEditingEvent(event);
@@ -217,7 +231,7 @@ export default function CalendarScreen() {
     title: string;
     assigneeType: AssigneeType;
     assigneeId?: string;
-    dayOfWeek: number;
+    daysOfWeek: number[];
     startMinutes: number;
     endMinutes: number;
     location?: string;
@@ -312,6 +326,7 @@ export default function CalendarScreen() {
                 markedDates={markedDates}
                 accentColor={C.purple}
                 onEventPress={handleGridEventPress}
+                onSlotPress={handleSlotPress}
               />
             )}
             {calendarView === "day" && (
@@ -320,6 +335,7 @@ export default function CalendarScreen() {
                 onSelectDate={setSelectedDate}
                 accentColor={C.purple}
                 onEventPress={handleGridEventPress}
+                onSlotPress={handleSlotPress}
               />
             )}
           </Card.Content>
@@ -369,10 +385,14 @@ export default function CalendarScreen() {
         onDismiss={() => {
           setModalOpen(false);
           setEditingEvent(null);
+          setSlotStartTime(undefined);
+          setSlotEndTime(undefined);
         }}
         editEvent={editingEvent}
-        defaultDayOfWeek={selectedDow}
+        defaultDaysOfWeek={[selectedDow]}
         defaultDate={selectedDate}
+        defaultStartTime={slotStartTime}
+        defaultEndTime={slotEndTime}
         onSubmit={handleSubmit}
       />
 
@@ -383,7 +403,7 @@ export default function CalendarScreen() {
           setEditingBlock(null);
         }}
         editBlock={editingBlock}
-        defaultDayOfWeek={selectedDow}
+        defaultDaysOfWeek={[selectedDow]}
         defaultDate={selectedDate}
         onSubmit={(data) => {
           if (editingBlock) {

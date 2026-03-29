@@ -45,7 +45,7 @@ export const scheduleBlocksRepo = {
       .where(
         and(
           eq(scheduleBlocks.kidId, kidId),
-          eq(scheduleBlocks.dayOfWeek, dayOfWeek),
+          sql`${scheduleBlocks.daysOfWeek} @> ${JSON.stringify([dayOfWeek])}::jsonb`,
         ),
       );
   },
@@ -70,7 +70,7 @@ export const scheduleBlocksRepo = {
         target: scheduleBlocks.id,
         set: {
           kidId: sql`excluded.kid_id`,
-          dayOfWeek: sql`excluded.day_of_week`,
+          daysOfWeek: sql`excluded.days_of_week`,
           title: sql`excluded.title`,
           type: sql`excluded.type`,
           startMinutes: sql`excluded.start_minutes`,

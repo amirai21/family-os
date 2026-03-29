@@ -19,7 +19,7 @@ export function seedScheduleIfEmpty() {
     for (let dow = 1; dow <= 5; dow++) {
       addScheduleBlockRemote({
         kidId: kid.id,
-        dayOfWeek: dow,
+        daysOfWeek: [dow],
         title: "בית ספר",
         type: "school",
         startMinutes: 480, // 08:00

@@ -133,7 +133,9 @@ export default function KidScheduleScreen() {
     const map: Record<number, ScheduleBlock[]> = {};
     for (let d = 0; d < 7; d++) map[d] = [];
     for (const b of allBlocks) {
-      map[b.dayOfWeek]?.push(b);
+      for (const dow of b.daysOfWeek) {
+        map[dow]?.push(b);
+      }
     }
     return map;
   }, [allBlocks]);
@@ -156,14 +158,14 @@ export default function KidScheduleScreen() {
 
   const openEdit = (block: ScheduleBlock) => {
     setEditingBlock(block);
-    setModalDay(block.dayOfWeek);
+    setModalDay(block.daysOfWeek[0] ?? 0);
     setModalOpen(true);
   };
 
   const handleSubmit = (data: {
     title: string;
     type: BlockType;
-    dayOfWeek: number;
+    daysOfWeek: number[];
     startMinutes: number;
     endMinutes: number;
     location?: string;
@@ -314,7 +316,7 @@ export default function KidScheduleScreen() {
             setEditingBlock(null);
           }}
           editBlock={editingBlock}
-          defaultDayOfWeek={modalDay}
+          defaultDaysOfWeek={[modalDay]}
           defaultDate={tab === "calendar" ? selectedDate : undefined}
           onSubmit={handleSubmit}
         />

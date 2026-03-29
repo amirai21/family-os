@@ -10,6 +10,14 @@ import { useMemo } from "react";
 import { useFamilyStore } from "./useFamilyStore";
 import type { FamilyEvent } from "@src/models/familyEvent";
 
+/** Safely get daysOfWeek as an array, handling legacy data where it might be a number or undefined. */
+function getDays(e: FamilyEvent): number[] {
+  const d = (e as any).daysOfWeek ?? (e as any).dayOfWeek;
+  if (Array.isArray(d)) return d;
+  if (typeof d === "number") return [d];
+  return [];
+}
+
 /**
  * Family events for a specific date.
  * Returns both recurring events for that date's DOW and one-time events on that exact date.
@@ -24,7 +32,7 @@ export function useFamilyEventsForDate(
       events
         .filter(
           (e) =>
-            (e.isRecurring && e.dayOfWeek === dayOfWeek) ||
+            (e.isRecurring && getDays(e).includes(dayOfWeek)) ||
             (!e.isRecurring && e.date === dateStr),
         )
         .sort((a, b) => a.startMinutes - b.startMinutes),
@@ -46,7 +54,7 @@ export function useTodayFamilyEvents(
       events
         .filter(
           (e) =>
-            (e.isRecurring && e.dayOfWeek === dayOfWeek) ||
+            (e.isRecurring && getDays(e).includes(dayOfWeek)) ||
             (!e.isRecurring && e.date === dateStr),
         )
         .sort((a, b) => a.startMinutes - b.startMinutes),
@@ -78,7 +86,9 @@ export function useFamilyEventRecurringByDay(): Record<number, FamilyEvent[]> {
     for (let d = 0; d < 7; d++) map[d] = [];
     for (const e of events) {
       if (e.isRecurring) {
-        map[e.dayOfWeek]?.push(e);
+        for (const dow of getDays(e)) {
+          map[dow]?.push(e);
+        }
       }
     }
     return map;

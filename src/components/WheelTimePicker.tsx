@@ -63,8 +63,10 @@ export default function WheelTimePicker({
   const selectedHour = useRef(hourIndex);
   const selectedMinute = useRef(minuteIndex);
 
-  // Scroll to initial position on mount
+  // Scroll to correct position whenever value changes (mount + prop updates)
   useEffect(() => {
+    selectedHour.current = hourIndex;
+    selectedMinute.current = minuteIndex;
     const timeout = setTimeout(() => {
       hourRef.current?.scrollToOffset({
         offset: hourIndex * ITEM_HEIGHT,
@@ -76,7 +78,7 @@ export default function WheelTimePicker({
       });
     }, 50);
     return () => clearTimeout(timeout);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const emitChange = useCallback(() => {
     const hh = String(selectedHour.current).padStart(2, "0");
@@ -208,8 +210,7 @@ WheelColumn.displayName = "WheelColumn";
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    direction: "ltr",
+    flexDirection: "row-reverse",  // RN Web auto-mirrors in RTL → becomes physical "row" (LTR)
     alignItems: "center",
     justifyContent: "center",
     height: PICKER_HEIGHT,
