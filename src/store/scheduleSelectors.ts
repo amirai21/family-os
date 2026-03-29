@@ -10,7 +10,15 @@ import { useMemo } from "react";
 import { useFamilyStore } from "./useFamilyStore";
 import type { ScheduleBlock } from "@src/models/schedule";
 
-/** All recurring blocks for a specific kid, sorted by dayOfWeek then startMinutes. */
+/** Safely get daysOfWeek as an array, handling legacy data where it might be a number or undefined. */
+function getDays(b: ScheduleBlock): number[] {
+  const d = (b as any).daysOfWeek ?? (b as any).dayOfWeek;
+  if (Array.isArray(d)) return d;
+  if (typeof d === "number") return [d];
+  return [];
+}
+
+/** All recurring blocks for a specific kid, sorted by first day then startMinutes. */
 export function useKidBlocks(kidId: string): ScheduleBlock[] {
   const blocks = useFamilyStore((s) => s.scheduleBlocks);
   return useMemo(
@@ -19,7 +27,7 @@ export function useKidBlocks(kidId: string): ScheduleBlock[] {
         .filter((b) => b.kidId === kidId && b.isRecurring)
         .sort(
           (a, b) =>
-            a.dayOfWeek - b.dayOfWeek || a.startMinutes - b.startMinutes,
+            ((a.daysOfWeek ?? [])[0] ?? 0) - (getDays(b)[0] ?? 0) || a.startMinutes - b.startMinutes,
         ),
     [blocks, kidId],
   );
@@ -34,7 +42,7 @@ export function useKidBlocksForDay(
   return useMemo(
     () =>
       blocks
-        .filter((b) => b.kidId === kidId && b.isRecurring && b.dayOfWeek === dayOfWeek)
+        .filter((b) => b.kidId === kidId && b.isRecurring && getDays(b).includes(dayOfWeek))
         .sort((a, b) => a.startMinutes - b.startMinutes),
     [blocks, kidId, dayOfWeek],
   );
@@ -56,7 +64,7 @@ export function useKidBlocksForDate(
         .filter(
           (b) =>
             b.kidId === kidId &&
-            ((b.isRecurring && b.dayOfWeek === dayOfWeek) ||
+            ((b.isRecurring && getDays(b).includes(dayOfWeek)) ||
               (!b.isRecurring && b.date === dateStr)),
         )
         .sort((a, b) => a.startMinutes - b.startMinutes),
@@ -91,7 +99,7 @@ export function useAllKidBlocksForDate(
       blocks
         .filter(
           (b) =>
-            (b.isRecurring && b.dayOfWeek === dayOfWeek) ||
+            (b.isRecurring && getDays(b).includes(dayOfWeek)) ||
             (!b.isRecurring && b.date === dateStr),
         )
         .sort((a, b) => a.startMinutes - b.startMinutes),
@@ -107,7 +115,9 @@ export function useAllKidRecurringByDay(): Record<number, ScheduleBlock[]> {
     for (let d = 0; d < 7; d++) map[d] = [];
     for (const b of blocks) {
       if (b.isRecurring) {
-        map[b.dayOfWeek]?.push(b);
+        for (const dow of getDays(b)) {
+          map[dow]?.push(b);
+        }
       }
     }
     return map;

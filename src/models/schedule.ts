@@ -3,7 +3,7 @@ export type BlockType = "school" | "hobby" | "other";
 export interface ScheduleBlock {
   id: string;
   kidId: string;
-  dayOfWeek: number; // 0 = Sun, 1 = Mon ... 6 = Sat
+  daysOfWeek: number[]; // [0, 2, 4] = Sun, Tue, Thu
   title: string;
   type: BlockType;
   startMinutes: number; // 480 = 08:00

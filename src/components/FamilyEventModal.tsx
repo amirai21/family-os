@@ -1,5 +1,6 @@
 /**
  * FamilyEventModal — Add / edit a family event (recurring or one-time).
+ * Premium styled modal with sectioned layout.
  */
 
 import React, { useEffect, useState } from "react";
@@ -15,7 +16,7 @@ import { hhmmToMinutes, minutesToHHMM } from "@src/utils/time";
 import { dayOfWeekFromYMD, toYMD } from "@src/utils/date";
 import { t, dayNameShort, assigneeTypeLabel } from "@src/i18n";
 import { MS, SEGMENT_THEME, SEGMENT_COLORS } from "@src/ui/modalStyles";
-import { C } from "@src/ui/tokens";
+import { C, S } from "@src/ui/tokens";
 import ModalWrapper from "./ModalWrapper";
 import WheelTimePicker from "./WheelTimePicker";
 import DatePicker, { formatDateHe } from "./DatePicker";
@@ -37,7 +38,7 @@ const schema = z
     assigneeType: z.enum(["family", "member", "kid"]),
     assigneeId: z.string().optional(),
     isRecurring: z.boolean(),
-    dayOfWeek: z.number().int().min(0).max(6),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
     date: z.string().optional(),
     startTime: z
       .string()
@@ -78,13 +79,15 @@ interface Props {
   visible: boolean;
   onDismiss: () => void;
   editEvent?: FamilyEvent | null;
-  defaultDayOfWeek?: number;
+  defaultDaysOfWeek?: number[];
   defaultDate?: string;
+  defaultStartTime?: string; // HH:MM — pre-fill from slot click
+  defaultEndTime?: string;   // HH:MM — pre-fill from slot click
   onSubmit: (data: {
     title: string;
     assigneeType: AssigneeType;
     assigneeId?: string;
-    dayOfWeek: number;
+    daysOfWeek: number[];
     startMinutes: number;
     endMinutes: number;
     location?: string;
@@ -98,8 +101,10 @@ export default function FamilyEventModal({
   visible,
   onDismiss,
   editEvent,
-  defaultDayOfWeek = 1,
+  defaultDaysOfWeek = [1],
   defaultDate,
+  defaultStartTime,
+  defaultEndTime,
   onSubmit,
 }: Props) {
   const familyMembers = useFamilyStore((s) => s.familyMembers);
@@ -123,7 +128,7 @@ export default function FamilyEventModal({
       assigneeType: "family",
       assigneeId: undefined,
       isRecurring: true,
-      dayOfWeek: defaultDayOfWeek,
+      daysOfWeek: defaultDaysOfWeek,
       date: defaultDate ?? toYMD(new Date()),
       startTime: "09:00",
       endTime: "10:00",
@@ -138,7 +143,7 @@ export default function FamilyEventModal({
         assigneeType: editEvent.assigneeType,
         assigneeId: editEvent.assigneeId,
         isRecurring: editEvent.isRecurring,
-        dayOfWeek: editEvent.dayOfWeek,
+        daysOfWeek: editEvent.daysOfWeek,
         date: editEvent.date ?? toYMD(new Date()),
         startTime: minutesToHHMM(editEvent.startMinutes),
         endTime: minutesToHHMM(editEvent.endMinutes),
@@ -146,36 +151,37 @@ export default function FamilyEventModal({
       });
       setSelectedReminders(editEvent.reminders ?? []);
     } else if (visible) {
+      const hasSlotTime = !!defaultStartTime;
       reset({
         title: "",
         assigneeType: "family",
         assigneeId: undefined,
-        isRecurring: true,
-        dayOfWeek: defaultDayOfWeek,
+        isRecurring: hasSlotTime ? false : true,
+        daysOfWeek: defaultDaysOfWeek,
         date: defaultDate ?? toYMD(new Date()),
-        startTime: "09:00",
-        endTime: "10:00",
+        startTime: defaultStartTime ?? "09:00",
+        endTime: defaultEndTime ?? "10:00",
         location: "",
       });
       setSelectedReminders([]);
     }
-  }, [visible, editEvent, defaultDayOfWeek, defaultDate, reset]);
+  }, [visible, editEvent, defaultDaysOfWeek, defaultDate, defaultStartTime, defaultEndTime, reset]);
 
   const assigneeType = watch("assigneeType");
-  const selectedDay = watch("dayOfWeek");
+  const selectedDays = watch("daysOfWeek");
   const isRecurring = watch("isRecurring");
   const assigneeId = watch("assigneeId");
 
   const doSubmit = (data: FormData) => {
-    const dayOfWeek = data.isRecurring
-      ? data.dayOfWeek
-      : dayOfWeekFromYMD(data.date!);
+    const daysOfWeek = data.isRecurring
+      ? data.daysOfWeek
+      : [dayOfWeekFromYMD(data.date!)];
 
     onSubmit({
       title: data.title.trim(),
       assigneeType: data.assigneeType as AssigneeType,
       assigneeId: data.assigneeType === "family" ? undefined : data.assigneeId,
-      dayOfWeek,
+      daysOfWeek,
       startMinutes: hhmmToMinutes(data.startTime),
       endMinutes: hhmmToMinutes(data.endTime),
       location: data.location?.trim() || undefined,
@@ -188,209 +194,280 @@ export default function FamilyEventModal({
 
   return (
     <ModalWrapper visible={visible} onDismiss={onDismiss}>
-      <Text style={MS.heading}>
-        {editEvent ? t("eventModal.editTitle") : t("eventModal.addTitle")}
-      </Text>
+      {/* ── Header ── */}
+      <View style={MS.headerBar}>
+        <View style={MS.headerIconWrap}>
+          <Text style={MS.headerIcon}>🎉</Text>
+        </View>
+        <Text style={MS.heading}>
+          {editEvent ? t("eventModal.editTitle") : t("eventModal.addTitle")}
+        </Text>
+      </View>
+
       {!editEvent && defaultDate && (
         <Text style={MS.subtitle}>{formatDateHe(defaultDate)}</Text>
       )}
 
-      <Controller
-        control={control}
-        name="title"
-        render={({ field: { onChange, value } }) => (
-          <TextInput
-            placeholder={t("eventModal.titleLabel")}
-            value={value}
-            onChangeText={onChange}
-            mode="outlined"
-            style={MS.input}
-            contentStyle={MS.inputContent}
-            error={!!errors.title}
-          />
-        )}
-      />
-      {errors.title && <Text style={MS.error}>{errors.title.message}</Text>}
-
-      <Text style={MS.label}>{t("eventModal.assignee")}</Text>
-      <SegmentedButtons
-        value={assigneeType}
-        onValueChange={(v) => {
-          setValue("assigneeType", v as "family" | "member" | "kid");
-          setValue("assigneeId", undefined);
-        }}
-        buttons={[
-          { value: "family", label: assigneeTypeLabel("family"), ...SEGMENT_COLORS },
-          { value: "member", label: assigneeTypeLabel("member"), ...SEGMENT_COLORS },
-          { value: "kid", label: assigneeTypeLabel("kid"), ...SEGMENT_COLORS },
-        ]}
-        style={MS.segmented}
-        theme={SEGMENT_THEME}
-      />
-
-      {assigneeType === "member" && activeMembers.length > 0 && (
-        <View style={MS.chipRow}>
-          {activeMembers.map((member) => {
-            const sel = assigneeId === member.id;
-            return (
-              <Button
-                key={member.id}
-                mode={sel ? "contained" : "outlined"}
-                compact
-                onPress={() => setValue("assigneeId", member.id)}
-                style={MS.chip}
-                labelStyle={MS.chipLabel}
-                buttonColor={sel ? C.selectBg : undefined}
-                textColor={sel ? C.selectText : C.textSecondary}
-              >
-                {member.avatarEmoji ?? ""} {member.name}
-              </Button>
-            );
-          })}
+      {/* ── Title & Assignee section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>✏️</Text>
+          <Text style={MS.sectionLabel}>{t("eventModal.titleLabel")}</Text>
         </View>
-      )}
+        <Controller
+          control={control}
+          name="title"
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              placeholder={t("eventModal.titleLabel")}
+              value={value}
+              onChangeText={onChange}
+              mode="outlined"
+              style={MS.input}
+              contentStyle={MS.inputContent}
+              error={!!errors.title}
+            />
+          )}
+        />
+        {errors.title && <Text style={MS.error}>{errors.title.message}</Text>}
 
-      {assigneeType === "kid" && activeKids.length > 0 && (
-        <View style={MS.chipRow}>
-          {activeKids.map((kid) => {
-            const sel = assigneeId === kid.id;
-            return (
-              <Button
-                key={kid.id}
-                mode={sel ? "contained" : "outlined"}
-                compact
-                onPress={() => setValue("assigneeId", kid.id)}
-                style={MS.chip}
-                labelStyle={MS.chipLabel}
-                buttonColor={sel ? C.selectBg : undefined}
-                textColor={sel ? C.selectText : C.textSecondary}
-              >
-                {kid.emoji}{"  "}{kid.name}
-              </Button>
-            );
-          })}
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>👥</Text>
+          <Text style={MS.sectionLabel}>{t("eventModal.assignee")}</Text>
         </View>
-      )}
+        <SegmentedButtons
+          value={assigneeType}
+          onValueChange={(v) => {
+            setValue("assigneeType", v as "family" | "member" | "kid");
+            setValue("assigneeId", undefined);
+          }}
+          buttons={[
+            { value: "family", label: assigneeTypeLabel("family"), ...SEGMENT_COLORS },
+            { value: "member", label: assigneeTypeLabel("member"), ...SEGMENT_COLORS },
+            { value: "kid", label: assigneeTypeLabel("kid"), ...SEGMENT_COLORS },
+          ]}
+          style={MS.segmented}
+          theme={SEGMENT_THEME}
+        />
 
-      <SegmentedButtons
-        value={isRecurring ? "recurring" : "oneTime"}
-        onValueChange={(v) => setValue("isRecurring", v === "recurring")}
-        buttons={[
-          { value: "recurring", label: t("eventModal.recurring"), ...SEGMENT_COLORS },
-          { value: "oneTime", label: t("eventModal.oneTime"), ...SEGMENT_COLORS },
-        ]}
-        style={MS.segmented}
-        theme={SEGMENT_THEME}
-      />
-
-      {isRecurring && (
-        <>
-          <Text style={MS.label}>{t("eventModal.day")}</Text>
+        {assigneeType === "member" && activeMembers.length > 0 && (
           <View style={MS.chipRow}>
-            {Array.from({ length: 7 }, (_, idx) => {
-              const sel = selectedDay === idx;
+            {activeMembers.map((member) => {
+              const sel = assigneeId === member.id;
+              const mc = member.color || C.selectText;
               return (
                 <Button
-                  key={idx}
+                  key={member.id}
                   mode={sel ? "contained" : "outlined"}
                   compact
-                  onPress={() => setValue("dayOfWeek", idx)}
-                  style={MS.chip}
+                  onPress={() => setValue("assigneeId", member.id)}
+                  style={[MS.chip, sel && { borderColor: mc }]}
                   labelStyle={MS.chipLabel}
-                  buttonColor={sel ? C.selectBg : undefined}
-                  textColor={sel ? C.selectText : C.textSecondary}
+                  buttonColor={sel ? mc + "20" : undefined}
+                  textColor={sel ? mc : C.textSecondary}
                 >
-                  {dayNameShort(idx)}
+                  {member.avatarEmoji ?? ""} {member.name}
                 </Button>
               );
             })}
           </View>
-        </>
-      )}
-
-      {!isRecurring && (
-        <>
-          <Text style={MS.label}>{t("eventModal.date")}</Text>
-          <Controller
-            control={control}
-            name="date"
-            render={({ field: { onChange, value } }) => (
-              <DatePicker value={value ?? toYMD(new Date())} onChange={onChange} />
-            )}
-          />
-          {errors.date && <Text style={MS.error}>{errors.date.message}</Text>}
-        </>
-      )}
-
-      <View style={MS.timeRow}>
-        <View style={MS.timeCol}>
-          <Text style={MS.label}>{t("eventModal.startTime")}</Text>
-          <Controller
-            control={control}
-            name="startTime"
-            render={({ field: { onChange, value } }) => (
-              <WheelTimePicker value={value} onChange={onChange} />
-            )}
-          />
-        </View>
-        <View style={MS.timeCol}>
-          <Text style={MS.label}>{t("eventModal.endTime")}</Text>
-          <Controller
-            control={control}
-            name="endTime"
-            render={({ field: { onChange, value } }) => (
-              <WheelTimePicker value={value} onChange={onChange} />
-            )}
-          />
-        </View>
-      </View>
-      {errors.endTime && <Text style={MS.error}>{errors.endTime.message}</Text>}
-
-      <Controller
-        control={control}
-        name="location"
-        render={({ field: { onChange, value } }) => (
-          <TextInput
-            placeholder={t("eventModal.location")}
-            value={value}
-            onChangeText={onChange}
-            mode="outlined"
-            style={MS.input}
-            contentStyle={MS.inputContent}
-          />
         )}
-      />
 
-      <Text style={MS.label}>{t("eventModal.reminders")}</Text>
-      <View style={MS.chipRow}>
-        {REMINDER_PRESETS.map(({ minutes, label }) => {
-          const selected = selectedReminders.includes(minutes);
-          return (
-            <Button
-              key={minutes}
-              mode={selected ? "contained" : "outlined"}
-              compact
-              onPress={() => {
-                if (selected) {
-                  setSelectedReminders((prev) => prev.filter((m) => m !== minutes));
-                } else if (selectedReminders.length < 3) {
-                  setSelectedReminders((prev) => [...prev, minutes]);
-                }
-              }}
-              style={MS.chip}
-              labelStyle={MS.chipLabel}
-              buttonColor={selected ? C.selectBg : undefined}
-              textColor={selected ? C.selectText : C.textSecondary}
-            >
-              {label}
-            </Button>
-          );
-        })}
+        {assigneeType === "kid" && activeKids.length > 0 && (
+          <View style={MS.chipRow}>
+            {activeKids.map((kid) => {
+              const sel = assigneeId === kid.id;
+              return (
+                <Button
+                  key={kid.id}
+                  mode={sel ? "contained" : "outlined"}
+                  compact
+                  onPress={() => setValue("assigneeId", kid.id)}
+                  style={[MS.chip, sel && { borderColor: kid.color }]}
+                  labelStyle={MS.chipLabel}
+                  buttonColor={sel ? kid.color + "20" : undefined}
+                  textColor={sel ? kid.color : C.textSecondary}
+                >
+                  {kid.emoji}{"  "}{kid.name}
+                </Button>
+              );
+            })}
+          </View>
+        )}
       </View>
 
+      {/* ── Schedule section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>{isRecurring ? "🔄" : "1️⃣"}</Text>
+          <Text style={MS.sectionLabel}>{t("eventModal.schedule")}</Text>
+        </View>
+        <SegmentedButtons
+          value={isRecurring ? "recurring" : "oneTime"}
+          onValueChange={(v) => setValue("isRecurring", v === "recurring")}
+          buttons={[
+            { value: "recurring", label: t("eventModal.recurring"), ...SEGMENT_COLORS },
+            { value: "oneTime", label: t("eventModal.oneTime"), ...SEGMENT_COLORS },
+          ]}
+          style={MS.segmented}
+          theme={SEGMENT_THEME}
+        />
+
+        {isRecurring && (
+          <>
+            <View style={[MS.sectionHeader, { marginTop: S.sm }]}>
+              <Text style={MS.sectionIcon}>📆</Text>
+              <Text style={MS.sectionLabel}>{t("eventModal.day")}</Text>
+            </View>
+            <View style={MS.chipRow}>
+              {Array.from({ length: 7 }, (_, idx) => {
+                const sel = selectedDays.includes(idx);
+                return (
+                  <Button
+                    key={idx}
+                    mode={sel ? "contained" : "outlined"}
+                    compact
+                    onPress={() => {
+                      const cur = selectedDays;
+                      if (cur.includes(idx)) {
+                        if (cur.length > 1) setValue("daysOfWeek", cur.filter((d) => d !== idx));
+                      } else {
+                        setValue("daysOfWeek", [...cur, idx]);
+                      }
+                    }}
+                    style={MS.chip}
+                    labelStyle={MS.chipLabel}
+                    buttonColor={sel ? C.selectBg : undefined}
+                    textColor={sel ? C.selectText : C.textSecondary}
+                  >
+                    {dayNameShort(idx)}
+                  </Button>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {!isRecurring && (
+          <>
+            <View style={[MS.sectionHeader, { marginTop: S.sm }]}>
+              <Text style={MS.sectionIcon}>📆</Text>
+              <Text style={MS.sectionLabel}>{t("eventModal.date")}</Text>
+            </View>
+            <Controller
+              control={control}
+              name="date"
+              render={({ field: { onChange, value } }) => (
+                <DatePicker value={value ?? toYMD(new Date())} onChange={onChange} />
+              )}
+            />
+            {errors.date && <Text style={MS.error}>{errors.date.message}</Text>}
+          </>
+        )}
+      </View>
+
+      {/* ── Time section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>⏰</Text>
+          <Text style={MS.sectionLabel}>{t("eventModal.startTime")}</Text>
+        </View>
+        <View style={MS.timeRow}>
+          <View style={MS.timeCol}>
+            <Text style={MS.timeLabel}>{t("eventModal.startTime")}</Text>
+            <Controller
+              control={control}
+              name="startTime"
+              render={({ field: { onChange, value } }) => (
+                <WheelTimePicker value={value} onChange={onChange} />
+              )}
+            />
+          </View>
+          <View style={MS.timeCol}>
+            <Text style={MS.timeLabel}>{t("eventModal.endTime")}</Text>
+            <Controller
+              control={control}
+              name="endTime"
+              render={({ field: { onChange, value } }) => (
+                <WheelTimePicker value={value} onChange={onChange} />
+              )}
+            />
+          </View>
+        </View>
+        {errors.endTime && <Text style={MS.error}>{errors.endTime.message}</Text>}
+      </View>
+
+      {/* ── Location section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>📍</Text>
+          <Text style={MS.sectionLabel}>{t("eventModal.location")}</Text>
+        </View>
+        <Controller
+          control={control}
+          name="location"
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              placeholder={t("eventModal.location")}
+              value={value}
+              onChangeText={onChange}
+              mode="outlined"
+              style={[MS.input, { marginBottom: 0 }]}
+              contentStyle={MS.inputContent}
+            />
+          )}
+        />
+      </View>
+
+      {/* ── Reminders section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>🔔</Text>
+          <Text style={MS.sectionLabel}>{t("eventModal.reminders")}</Text>
+        </View>
+        <View style={MS.chipRow}>
+          {REMINDER_PRESETS.map(({ minutes, label }) => {
+            const selected = selectedReminders.includes(minutes);
+            return (
+              <Button
+                key={minutes}
+                mode={selected ? "contained" : "outlined"}
+                compact
+                onPress={() => {
+                  if (selected) {
+                    setSelectedReminders((prev) => prev.filter((m) => m !== minutes));
+                  } else if (selectedReminders.length < 3) {
+                    setSelectedReminders((prev) => [...prev, minutes]);
+                  }
+                }}
+                style={MS.chip}
+                labelStyle={MS.chipLabel}
+                buttonColor={selected ? C.selectBg : undefined}
+                textColor={selected ? C.selectText : C.textSecondary}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* ── Actions ── */}
       <View style={MS.actions}>
-        <Button onPress={onDismiss}>{t("cancel")}</Button>
-        <Button mode="contained" onPress={handleSubmit(doSubmit)}>
+        <Button
+          mode="outlined"
+          onPress={onDismiss}
+          style={MS.cancelBtn}
+          labelStyle={MS.cancelLabel}
+        >
+          {t("cancel")}
+        </Button>
+        <Button
+          mode="contained"
+          onPress={handleSubmit(doSubmit)}
+          style={MS.saveBtn}
+          labelStyle={MS.saveBtnLabel}
+        >
           {editEvent ? t("save") : t("add")}
         </Button>
       </View>

@@ -109,7 +109,7 @@ interface FamilyState {
     title: string;
     assigneeType: AssigneeType;
     assigneeId?: string;
-    dayOfWeek: number;
+    daysOfWeek: number[];
     startMinutes: number;
     endMinutes: number;
     location?: string;
@@ -123,7 +123,7 @@ interface FamilyState {
     patch: Partial<
       Pick<
         FamilyEvent,
-        "title" | "assigneeType" | "assigneeId" | "dayOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
+        "title" | "assigneeType" | "assigneeId" | "daysOfWeek" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
       >
     >
   ) => void;
@@ -132,7 +132,7 @@ interface FamilyState {
   // Schedule actions
   addScheduleBlock: (input: {
     kidId: string;
-    dayOfWeek: number;
+    daysOfWeek: number[];
     title: string;
     type: BlockType;
     startMinutes: number;
@@ -148,7 +148,7 @@ interface FamilyState {
     patch: Partial<
       Pick<
         ScheduleBlock,
-        "dayOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
+        "daysOfWeek" | "title" | "type" | "startMinutes" | "endMinutes" | "location" | "color" | "isRecurring" | "date" | "reminders"
       >
     >
   ) => void;
@@ -490,7 +490,7 @@ export const useFamilyStore = create<FamilyState>()(
     }),
     {
       name: "family-os-store-v2",
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         familyName: state.familyName,
@@ -557,6 +557,17 @@ export const useFamilyStore = create<FamilyState>()(
           persisted.familyEvents = (persisted.familyEvents ?? []).map((e: any) => ({
             ...e,
             reminders: e.reminders ?? undefined,
+          }));
+        }
+        if (version < 9) {
+          // Convert dayOfWeek (number) to daysOfWeek (number[])
+          persisted.scheduleBlocks = (persisted.scheduleBlocks ?? []).map((b: any) => ({
+            ...b,
+            daysOfWeek: b.daysOfWeek ?? (b.dayOfWeek != null ? [b.dayOfWeek] : [0]),
+          }));
+          persisted.familyEvents = (persisted.familyEvents ?? []).map((e: any) => ({
+            ...e,
+            daysOfWeek: e.daysOfWeek ?? (e.dayOfWeek != null ? [e.dayOfWeek] : [0]),
           }));
         }
         return persisted;

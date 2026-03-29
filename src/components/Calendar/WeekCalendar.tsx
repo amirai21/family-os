@@ -40,6 +40,7 @@ interface Props {
   markedDates?: Record<string, MarkedDate>; // kept for API compat
   accentColor?: string;
   onEventPress?: (id: string, source: "event" | "block") => void;
+  onSlotPress?: (date: string, startMinutes: number, endMinutes: number) => void;
 }
 
 interface EventItem {
@@ -167,11 +168,15 @@ function layoutEvents(events: EventItem[]): LayoutedEvent[] {
 // Component
 // ---------------------------------------------------------------------------
 
+// Half-hour slot height
+const SLOT_HEIGHT = HOUR_HEIGHT / 2;
+
 export default function WeekCalendar({
   selectedDate,
   onSelectDate,
   accentColor = DEFAULT_ACCENT,
   onEventPress,
+  onSlotPress,
 }: Props) {
   // ── Week navigation ──
   const [weekOffset, setWeekOffset] = React.useState(0);
@@ -388,16 +393,32 @@ export default function WeekCalendar({
               const dateStr = ymd(day);
               const isSelected = dateStr === selectedDate;
               const events = weekEvents[dateStr] ?? [];
+              const totalSlots = (GRID_END_HOUR - GRID_START_HOUR) * 2;
               return (
-                <Pressable
+                <View
                   key={i}
                   style={[
                     styles.dayColumn,
                     isSelected && { backgroundColor: accentColor + "0A" },
                     i < 6 && styles.dayColumnBorder,
                   ]}
-                  onPress={() => onSelectDate(dateStr)}
                 >
+                  {/* Clickable half-hour slot overlays */}
+                  {onSlotPress && Array.from({ length: totalSlots }, (_, si) => {
+                    const slotStart = (GRID_START_HOUR * 60) + (si * 30);
+                    const slotEnd = slotStart + 60; // 1-hour event
+                    return (
+                      <Pressable
+                        key={si}
+                        style={({ hovered }: any) => [
+                          styles.timeSlot,
+                          { top: si * SLOT_HEIGHT, height: SLOT_HEIGHT },
+                          hovered && styles.timeSlotHover,
+                        ]}
+                        onPress={() => onSlotPress(dateStr, slotStart, Math.min(slotEnd, GRID_END_HOUR * 60))}
+                      />
+                    );
+                  })}
                   {events.map((ev) => {
                     const clampedStart = Math.max(ev.startMinutes, GRID_START_HOUR * 60);
                     const clampedEnd = Math.min(ev.endMinutes, GRID_END_HOUR * 60);
@@ -437,7 +458,7 @@ export default function WeekCalendar({
                       </Pressable>
                     );
                   })}
-                </Pressable>
+                </View>
               );
             })}
           </View>
@@ -553,6 +574,18 @@ const styles = StyleSheet.create({
     borderRightColor: C.border,
   },
 
+  // Time slots (clickable half-hour areas)
+  timeSlot: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 0,
+    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
+  },
+  timeSlotHover: {
+    backgroundColor: "rgba(108, 99, 255, 0.06)",
+  },
+
   // Event blocks
   eventBlock: {
     position: "absolute",
@@ -562,6 +595,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     overflow: "hidden",
     marginRight: 1,
+    zIndex: 1,
     ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
   },
   eventTitle: {

@@ -4,6 +4,7 @@ import {
   text,
   boolean,
   integer,
+  jsonb,
   timestamp,
   index,
   check,
@@ -244,7 +245,7 @@ export const scheduleBlocks = pgTable(
     kidId: uuid("kid_id")
       .notNull()
       .references(() => kids.id, { onDelete: "cascade" }),
-    dayOfWeek: integer("day_of_week").notNull(), // 0 = Sun … 6 = Sat
+    daysOfWeek: jsonb("days_of_week").$type<number[]>().notNull(), // [0,2,4] = Sun,Tue,Thu
     title: text("title").notNull(),
     type: text("type", { enum: ["school", "hobby", "other"] })
       .default("other")
@@ -261,11 +262,6 @@ export const scheduleBlocks = pgTable(
   (t) => [
     index("schedule_blocks_family_id_idx").on(t.familyId),
     index("schedule_blocks_kid_id_idx").on(t.kidId),
-    index("schedule_blocks_kid_dow_idx").on(t.kidId, t.dayOfWeek),
-    check(
-      "schedule_blocks_dow_range",
-      sql`${t.dayOfWeek} >= 0 AND ${t.dayOfWeek} <= 6`,
-    ),
     check(
       "schedule_blocks_time_range",
       sql`${t.startMinutes} >= 0 AND ${t.startMinutes} < 1440 AND ${t.endMinutes} > 0 AND ${t.endMinutes} <= 1440`,
@@ -307,7 +303,7 @@ export const familyEvents = pgTable(
       .default("family")
       .notNull(),
     assigneeId: uuid("assignee_id"),
-    dayOfWeek: integer("day_of_week").notNull(), // 0 = Sun … 6 = Sat
+    daysOfWeek: jsonb("days_of_week").$type<number[]>().notNull(), // [0,2,4] = Sun,Tue,Thu
     startMinutes: integer("start_minutes").notNull(), // 0–1439
     endMinutes: integer("end_minutes").notNull(),
     location: text("location"),
@@ -319,11 +315,6 @@ export const familyEvents = pgTable(
   },
   (t) => [
     index("family_events_family_id_idx").on(t.familyId),
-    index("family_events_family_dow_idx").on(t.familyId, t.dayOfWeek),
-    check(
-      "family_events_dow_range",
-      sql`${t.dayOfWeek} >= 0 AND ${t.dayOfWeek} <= 6`,
-    ),
     check(
       "family_events_time_range",
       sql`${t.startMinutes} >= 0 AND ${t.startMinutes} < 1440 AND ${t.endMinutes} > 0 AND ${t.endMinutes} <= 1440`,

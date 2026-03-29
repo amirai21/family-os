@@ -1,5 +1,5 @@
 /**
- * Shared modal styles — used across all modal components.
+ * Shared modal styles — premium design system for all modals.
  * Import these instead of defining per-modal style objects.
  */
 
@@ -18,21 +18,101 @@ export const SEGMENT_COLORS = {
   uncheckedColor: C.textSecondary,
 } as const;
 
+// Premium accent colors
+const MODAL_ACCENT = "#6C63FF";
+const MODAL_ACCENT_LIGHT = "#F0EEFF";
+const SECTION_BG = "#FAFAFC";
+const SECTION_BORDER = "#EDEDF3";
+
 export const MS = StyleSheet.create({
-  heading: {
-    fontWeight: "700",
-    marginBottom: S.lg,
-    textAlign: "right",
-    color: C.textPrimary,
-    fontSize: 18,
+  // ---------------------------------------------------------------------------
+  // Header
+  // ---------------------------------------------------------------------------
+  headerBar: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    marginTop: S.lg,
+    marginBottom: S.xl,
+    paddingBottom: S.md,
+    borderBottomWidth: 2,
+    borderBottomColor: MODAL_ACCENT,
+    gap: S.sm,
   },
+  headerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: MODAL_ACCENT_LIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerIcon: {
+    fontSize: 20,
+  },
+  heading: {
+    fontWeight: "800",
+    color: C.textPrimary,
+    fontSize: 20,
+    letterSpacing: -0.3,
+    flex: 1,
+    textAlign: "right",
+  },
+
+  // ---------------------------------------------------------------------------
+  // Sections — group related fields into subtle cards
+  // ---------------------------------------------------------------------------
+  section: {
+    backgroundColor: SECTION_BG,
+    borderRadius: R.md,
+    borderWidth: 1,
+    borderColor: SECTION_BORDER,
+    padding: S.md,
+    marginBottom: S.sm,
+  },
+  sectionHeader: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    gap: 6,
+    marginBottom: S.sm + 2,
+  },
+  sectionIcon: {
+    fontSize: 15,
+    opacity: 0.7,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+
+  // ---------------------------------------------------------------------------
+  // Subtitle (e.g. kid name under heading)
+  // ---------------------------------------------------------------------------
   subtitle: {
     fontSize: 13,
-    color: C.purple,
+    color: MODAL_ACCENT,
     textAlign: "right",
-    marginTop: -S.sm,
-    marginBottom: S.md,
+    marginTop: -S.lg,
+    marginBottom: S.lg,
   },
+  kidBadge: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    backgroundColor: MODAL_ACCENT_LIGHT,
+    borderRadius: R.xl,
+    paddingHorizontal: S.md,
+    paddingVertical: S.xs + 2,
+    gap: S.sm - 2,
+    marginTop: -S.md,
+    marginBottom: S.lg,
+  },
+
+  // ---------------------------------------------------------------------------
+  // Form elements
+  // ---------------------------------------------------------------------------
   label: {
     textAlign: "right",
     marginTop: S.sm,
@@ -45,7 +125,7 @@ export const MS = StyleSheet.create({
     marginBottom: S.md,
     textAlign: "right",
     writingDirection: "rtl",
-    backgroundColor: C.surface,
+    backgroundColor: "#FFFFFF",
   },
   inputContent: {
     textAlign: "right",
@@ -57,6 +137,10 @@ export const MS = StyleSheet.create({
     marginTop: -(S.xs),
     textAlign: "right",
   },
+
+  // ---------------------------------------------------------------------------
+  // Chips & segments
+  // ---------------------------------------------------------------------------
   chipRow: {
     flexDirection: RTL_ROW,
     flexWrap: "wrap",
@@ -73,23 +157,58 @@ export const MS = StyleSheet.create({
     marginBottom: S.sm + 2,
     marginTop: S.xs,
   },
+
+  // ---------------------------------------------------------------------------
+  // Time pickers
+  // ---------------------------------------------------------------------------
   timeRow: {
     flexDirection: RTL_ROW,
     gap: S.md,
-    marginBottom: S.xl,
+    marginBottom: S.sm,
   },
   timeCol: {
     flex: 1,
   },
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: MODAL_ACCENT,
+    textAlign: "center",
+    marginBottom: S.xs + 2,
+  },
+
+  // ---------------------------------------------------------------------------
+  // Actions — premium buttons
+  // ---------------------------------------------------------------------------
   actions: {
     flexDirection: RTL_ROW,
     justifyContent: "flex-end",
-    gap: S.sm,
-    marginTop: S.md,
-    paddingTop: S.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.border,
+    gap: S.sm + 2,
+    marginTop: S.xl,
+    paddingTop: S.lg,
   },
+  cancelBtn: {
+    borderRadius: R.xl,
+    borderColor: SECTION_BORDER,
+  },
+  cancelLabel: {
+    color: C.textSecondary,
+    fontWeight: "600",
+  },
+  saveBtn: {
+    borderRadius: R.xl,
+    paddingHorizontal: S.xl,
+    backgroundColor: MODAL_ACCENT,
+  },
+  saveBtnLabel: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  // ---------------------------------------------------------------------------
+  // Legacy compat (unused but kept to avoid import errors)
+  // ---------------------------------------------------------------------------
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: C.border,

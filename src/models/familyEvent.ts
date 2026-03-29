@@ -5,7 +5,7 @@ export interface FamilyEvent {
   title: string;
   assigneeType: AssigneeType;
   assigneeId?: string;
-  dayOfWeek: number; // 0 = Sun, 1 = Mon ... 6 = Sat
+  daysOfWeek: number[]; // [0, 2, 4] = Sun, Tue, Thu
   startMinutes: number; // 0–1439
   endMinutes: number;
   location?: string;

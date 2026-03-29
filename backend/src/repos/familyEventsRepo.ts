@@ -50,7 +50,7 @@ export const familyEventsRepo = {
           title: sql`excluded.title`,
           assigneeType: sql`excluded.assignee_type`,
           assigneeId: sql`excluded.assignee_id`,
-          dayOfWeek: sql`excluded.day_of_week`,
+          daysOfWeek: sql`excluded.days_of_week`,
           startMinutes: sql`excluded.start_minutes`,
           endMinutes: sql`excluded.end_minutes`,
           location: sql`excluded.location`,

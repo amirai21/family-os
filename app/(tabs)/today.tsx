@@ -415,7 +415,7 @@ export default function TodayScreen() {
           setEditingEvent(null);
         }}
         editEvent={editingEvent}
-        defaultDayOfWeek={todayDow}
+        defaultDaysOfWeek={[todayDow]}
         defaultDate={todayDate}
         onSubmit={(data) => {
           if (editingEvent) {
@@ -431,7 +431,7 @@ export default function TodayScreen() {
           setEditingBlock(null);
         }}
         editBlock={editingBlock}
-        defaultDayOfWeek={todayDow}
+        defaultDaysOfWeek={[todayDow]}
         defaultDate={todayDate}
         onSubmit={(data) => {
           if (editingBlock) {

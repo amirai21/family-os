@@ -1,6 +1,6 @@
 /**
  * ScheduleBlockModal — Add / edit a schedule block (recurring or one-time).
- * Uses react-hook-form + zod for validation.
+ * Premium styled modal with sectioned layout.
  */
 
 import React, { useEffect, useState } from "react";
@@ -13,7 +13,7 @@ import { z } from "zod";
 import type { ScheduleBlock, BlockType } from "@src/models/schedule";
 import { BLOCK_TYPES } from "@src/models/schedule";
 import { useFamilyStore } from "@src/store/useFamilyStore";
-import { C, S, R } from "@src/ui/tokens";
+import { C, S } from "@src/ui/tokens";
 import { hhmmToMinutes, minutesToHHMM } from "@src/utils/time";
 import { dayOfWeekFromYMD, toYMD } from "@src/utils/date";
 import { t, dayNameShort, blockTypeLabel } from "@src/i18n";
@@ -41,7 +41,7 @@ const schema = z
     title: z.string().min(1, t("blockModal.titleRequired")),
     type: z.enum(["school", "hobby", "other"]),
     isRecurring: z.boolean(),
-    dayOfWeek: z.number().int().min(0).max(6),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
     date: z.string().optional(),
     startTime: z
       .string()
@@ -86,12 +86,12 @@ interface Props {
   visible: boolean;
   onDismiss: () => void;
   editBlock?: ScheduleBlock | null;
-  defaultDayOfWeek?: number;
+  defaultDaysOfWeek?: number[];
   defaultDate?: string;
   onSubmit: (data: {
     title: string;
     type: BlockType;
-    dayOfWeek: number;
+    daysOfWeek: number[];
     startMinutes: number;
     endMinutes: number;
     location?: string;
@@ -109,7 +109,7 @@ export default function ScheduleBlockModal({
   visible,
   onDismiss,
   editBlock,
-  defaultDayOfWeek = 1,
+  defaultDaysOfWeek = [1],
   defaultDate,
   onSubmit,
 }: Props) {
@@ -130,7 +130,7 @@ export default function ScheduleBlockModal({
       title: "",
       type: "other",
       isRecurring: true,
-      dayOfWeek: defaultDayOfWeek,
+      daysOfWeek: defaultDaysOfWeek,
       date: defaultDate ?? toYMD(new Date()),
       startTime: "09:00",
       endTime: "10:00",
@@ -144,7 +144,7 @@ export default function ScheduleBlockModal({
         title: editBlock.title,
         type: editBlock.type,
         isRecurring: editBlock.isRecurring,
-        dayOfWeek: editBlock.dayOfWeek,
+        daysOfWeek: editBlock.daysOfWeek,
         date: editBlock.date ?? toYMD(new Date()),
         startTime: minutesToHHMM(editBlock.startMinutes),
         endTime: minutesToHHMM(editBlock.endMinutes),
@@ -156,7 +156,7 @@ export default function ScheduleBlockModal({
         title: "",
         type: "other",
         isRecurring: true,
-        dayOfWeek: defaultDayOfWeek,
+        daysOfWeek: defaultDaysOfWeek,
         date: defaultDate ?? toYMD(new Date()),
         startTime: "09:00",
         endTime: "10:00",
@@ -164,21 +164,21 @@ export default function ScheduleBlockModal({
       });
       setSelectedReminders([]);
     }
-  }, [visible, editBlock, defaultDayOfWeek, defaultDate, reset]);
+  }, [visible, editBlock, defaultDaysOfWeek, defaultDate, reset]);
 
   const selectedType = watch("type");
-  const selectedDay = watch("dayOfWeek");
+  const selectedDays = watch("daysOfWeek");
   const isRecurring = watch("isRecurring");
 
   const doSubmit = (data: FormData) => {
-    const dayOfWeek = data.isRecurring
-      ? data.dayOfWeek
-      : dayOfWeekFromYMD(data.date!);
+    const daysOfWeek = data.isRecurring
+      ? data.daysOfWeek
+      : [dayOfWeekFromYMD(data.date!)];
 
     onSubmit({
       title: data.title.trim(),
       type: data.type,
-      dayOfWeek,
+      daysOfWeek,
       startMinutes: hhmmToMinutes(data.startTime),
       endMinutes: hhmmToMinutes(data.endTime),
       location: data.location?.trim() || undefined,
@@ -191,211 +191,253 @@ export default function ScheduleBlockModal({
 
   return (
     <ModalWrapper visible={visible} onDismiss={onDismiss}>
-      <Text variant="titleLarge" style={MS.heading}>
-        {editBlock ? t("blockModal.editTitle") : t("blockModal.addTitle")}
-      </Text>
+      {/* ── Header ── */}
+      <View style={MS.headerBar}>
+        <View style={MS.headerIconWrap}>
+          <Text style={MS.headerIcon}>📅</Text>
+        </View>
+        <Text style={MS.heading}>
+          {editBlock ? t("blockModal.editTitle") : t("blockModal.addTitle")}
+        </Text>
+      </View>
 
       {editKid && (
-        <View style={{ flexDirection: "row-reverse", alignItems: "center", marginBottom: S.md, gap: S.sm }}>
-          <Text style={{ fontSize: 20 }}>{editKid.emoji}</Text>
-          <Text style={{ fontSize: 14, fontWeight: "600", color: editKid.color }}>{editKid.name}</Text>
+        <View style={MS.kidBadge}>
+          <Text style={{ fontSize: 18 }}>{editKid.emoji}</Text>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: editKid.color }}>{editKid.name}</Text>
         </View>
       )}
 
-      {/* Title */}
-      <Controller
-        control={control}
-        name="title"
-        render={({ field: { onChange, value } }) => (
-          <TextInput
-            placeholder={t("blockModal.titleLabel")}
-            value={value}
-            onChangeText={onChange}
-            mode="outlined"
-            style={MS.input}
-            contentStyle={MS.inputContent}
-            error={!!errors.title}
-          />
-        )}
-      />
-      {errors.title && (
-        <Text style={MS.error}>{errors.title.message}</Text>
-      )}
-
-      {/* Type */}
-      <Text variant="labelLarge" style={MS.label}>
-        {t("blockModal.type")}
-      </Text>
-      <View style={MS.chipRow}>
-        {BLOCK_TYPES.map((bt) => {
-          const sel = selectedType === bt.value;
-          return (
-            <Button
-              key={bt.value}
-              mode={sel ? "contained" : "outlined"}
-              compact
-              onPress={() => setValue("type", bt.value)}
-              style={MS.chip}
-              labelStyle={MS.chipLabel}
-              buttonColor={sel ? C.selectBg : undefined}
-              textColor={sel ? C.selectText : C.textSecondary}
-            >
-              {blockTypeLabel(bt.value)}
-            </Button>
-          );
-        })}
-      </View>
-
-      {/* Recurring / One-time toggle */}
-      <SegmentedButtons
-        value={isRecurring ? "recurring" : "oneTime"}
-        onValueChange={(v) => setValue("isRecurring", v === "recurring")}
-        buttons={[
-          { value: "recurring", label: t("blockModal.recurring"), ...SEGMENT_COLORS },
-          { value: "oneTime", label: t("blockModal.oneTime"), ...SEGMENT_COLORS },
-        ]}
-        style={MS.segmented}
-        theme={SEGMENT_THEME}
-      />
-
-      {/* Day of week — only for recurring */}
-      {isRecurring && (
-        <>
-          <Text variant="labelLarge" style={MS.label}>
-            {t("blockModal.day")}
-          </Text>
-          <View style={MS.chipRow}>
-            {Array.from({ length: 7 }, (_, idx) => {
-              const sel = selectedDay === idx;
-              return (
-                <Button
-                  key={idx}
-                  mode={sel ? "contained" : "outlined"}
-                  compact
-                  onPress={() => setValue("dayOfWeek", idx)}
-                  style={MS.chip}
-                  labelStyle={MS.chipLabel}
-                  buttonColor={sel ? C.selectBg : undefined}
-                  textColor={sel ? C.selectText : C.textSecondary}
-                >
-                  {dayNameShort(idx)}
-                </Button>
-              );
-            })}
-          </View>
-        </>
-      )}
-
-      {/* Date picker — only for one-time events */}
-      {!isRecurring && (
-        <>
-          <Text variant="labelLarge" style={MS.label}>
-            {t("blockModal.date")}
-          </Text>
-          <Controller
-            control={control}
-            name="date"
-            render={({ field: { onChange, value } }) => (
-              <TextInput
-                value={value}
-                onChangeText={onChange}
-                mode="outlined"
-                style={MS.input}
-                contentStyle={MS.inputContent}
-                placeholder="2026-03-15"
-                error={!!errors.date}
-              />
-            )}
-          />
-          {errors.date && (
-            <Text style={MS.error}>{errors.date.message}</Text>
+      {/* ── Title & Type section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>✏️</Text>
+          <Text style={MS.sectionLabel}>{t("blockModal.titleLabel")}</Text>
+        </View>
+        <Controller
+          control={control}
+          name="title"
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              placeholder={t("blockModal.titleLabel")}
+              value={value}
+              onChangeText={onChange}
+              mode="outlined"
+              style={MS.input}
+              contentStyle={MS.inputContent}
+              error={!!errors.title}
+            />
           )}
-        </>
-      )}
+        />
+        {errors.title && <Text style={MS.error}>{errors.title.message}</Text>}
 
-      {/* Times */}
-      <View style={MS.timeRow}>
-        <View style={MS.timeCol}>
-          <Text variant="labelLarge" style={MS.label}>
-            {t("blockModal.startTime")}
-          </Text>
-          <Controller
-            control={control}
-            name="startTime"
-            render={({ field: { onChange, value } }) => (
-              <WheelTimePicker value={value} onChange={onChange} />
-            )}
-          />
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>🏷️</Text>
+          <Text style={MS.sectionLabel}>{t("blockModal.type")}</Text>
         </View>
-        <View style={MS.timeCol}>
-          <Text variant="labelLarge" style={MS.label}>
-            {t("blockModal.endTime")}
-          </Text>
-          <Controller
-            control={control}
-            name="endTime"
-            render={({ field: { onChange, value } }) => (
-              <WheelTimePicker value={value} onChange={onChange} />
-            )}
-          />
+        <View style={MS.chipRow}>
+          {BLOCK_TYPES.map((bt) => {
+            const sel = selectedType === bt.value;
+            return (
+              <Button
+                key={bt.value}
+                mode={sel ? "contained" : "outlined"}
+                compact
+                onPress={() => setValue("type", bt.value)}
+                style={MS.chip}
+                labelStyle={MS.chipLabel}
+                buttonColor={sel ? C.selectBg : undefined}
+                textColor={sel ? C.selectText : C.textSecondary}
+              >
+                {blockTypeLabel(bt.value)}
+              </Button>
+            );
+          })}
         </View>
       </View>
-      {errors.endTime && (
-        <Text style={MS.error}>{errors.endTime.message}</Text>
-      )}
 
-      {/* Location */}
-      <Controller
-        control={control}
-        name="location"
-        render={({ field: { onChange, value } }) => (
-          <TextInput
-            placeholder={t("blockModal.location")}
-            value={value}
-            onChangeText={onChange}
-            mode="outlined"
-            style={MS.input}
-            contentStyle={MS.inputContent}
-          />
+      {/* ── Schedule section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>{isRecurring ? "🔄" : "1️⃣"}</Text>
+          <Text style={MS.sectionLabel}>{t("blockModal.schedule")}</Text>
+        </View>
+        <SegmentedButtons
+          value={isRecurring ? "recurring" : "oneTime"}
+          onValueChange={(v) => setValue("isRecurring", v === "recurring")}
+          buttons={[
+            { value: "recurring", label: t("blockModal.recurring"), ...SEGMENT_COLORS },
+            { value: "oneTime", label: t("blockModal.oneTime"), ...SEGMENT_COLORS },
+          ]}
+          style={MS.segmented}
+          theme={SEGMENT_THEME}
+        />
+
+        {isRecurring && (
+          <>
+            <View style={[MS.sectionHeader, { marginTop: S.sm }]}>
+              <Text style={MS.sectionIcon}>📆</Text>
+              <Text style={MS.sectionLabel}>{t("blockModal.day")}</Text>
+            </View>
+            <View style={MS.chipRow}>
+              {Array.from({ length: 7 }, (_, idx) => {
+                const sel = selectedDays.includes(idx);
+                return (
+                  <Button
+                    key={idx}
+                    mode={sel ? "contained" : "outlined"}
+                    compact
+                    onPress={() => {
+                      const cur = selectedDays;
+                      if (cur.includes(idx)) {
+                        if (cur.length > 1) setValue("daysOfWeek", cur.filter((d) => d !== idx));
+                      } else {
+                        setValue("daysOfWeek", [...cur, idx]);
+                      }
+                    }}
+                    style={MS.chip}
+                    labelStyle={MS.chipLabel}
+                    buttonColor={sel ? C.selectBg : undefined}
+                    textColor={sel ? C.selectText : C.textSecondary}
+                  >
+                    {dayNameShort(idx)}
+                  </Button>
+                );
+              })}
+            </View>
+          </>
         )}
-      />
 
-      {/* Reminders */}
-      <Text variant="labelLarge" style={MS.label}>
-        {t("eventModal.reminders")}
-      </Text>
-      <View style={MS.chipRow}>
-        {REMINDER_PRESETS.map(({ minutes, label }) => {
-          const selected = selectedReminders.includes(minutes);
-          return (
-            <Button
-              key={minutes}
-              mode={selected ? "contained" : "outlined"}
-              compact
-              onPress={() => {
-                if (selected) {
-                  setSelectedReminders((prev) =>
-                    prev.filter((m) => m !== minutes),
-                  );
-                } else if (selectedReminders.length < 3) {
-                  setSelectedReminders((prev) => [...prev, minutes]);
-                }
-              }}
-              style={MS.chip}
-              labelStyle={MS.chipLabel}
-              buttonColor={selected ? C.selectBg : undefined}
-              textColor={selected ? C.selectText : C.textSecondary}
-            >
-              {label}
-            </Button>
-          );
-        })}
+        {!isRecurring && (
+          <>
+            <View style={[MS.sectionHeader, { marginTop: S.sm }]}>
+              <Text style={MS.sectionIcon}>📆</Text>
+              <Text style={MS.sectionLabel}>{t("blockModal.date")}</Text>
+            </View>
+            <Controller
+              control={control}
+              name="date"
+              render={({ field: { onChange, value } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  mode="outlined"
+                  style={MS.input}
+                  contentStyle={MS.inputContent}
+                  placeholder="2026-03-15"
+                  error={!!errors.date}
+                />
+              )}
+            />
+            {errors.date && <Text style={MS.error}>{errors.date.message}</Text>}
+          </>
+        )}
       </View>
 
-      {/* Actions */}
+      {/* ── Time section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>⏰</Text>
+          <Text style={MS.sectionLabel}>{t("blockModal.startTime")}</Text>
+        </View>
+        <View style={MS.timeRow}>
+          <View style={MS.timeCol}>
+            <Text style={MS.timeLabel}>{t("blockModal.startTime")}</Text>
+            <Controller
+              control={control}
+              name="startTime"
+              render={({ field: { onChange, value } }) => (
+                <WheelTimePicker value={value} onChange={onChange} />
+              )}
+            />
+          </View>
+          <View style={MS.timeCol}>
+            <Text style={MS.timeLabel}>{t("blockModal.endTime")}</Text>
+            <Controller
+              control={control}
+              name="endTime"
+              render={({ field: { onChange, value } }) => (
+                <WheelTimePicker value={value} onChange={onChange} />
+              )}
+            />
+          </View>
+        </View>
+        {errors.endTime && <Text style={MS.error}>{errors.endTime.message}</Text>}
+      </View>
+
+      {/* ── Location section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>📍</Text>
+          <Text style={MS.sectionLabel}>{t("blockModal.location")}</Text>
+        </View>
+        <Controller
+          control={control}
+          name="location"
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              placeholder={t("blockModal.location")}
+              value={value}
+              onChangeText={onChange}
+              mode="outlined"
+              style={[MS.input, { marginBottom: 0 }]}
+              contentStyle={MS.inputContent}
+            />
+          )}
+        />
+      </View>
+
+      {/* ── Reminders section ── */}
+      <View style={MS.section}>
+        <View style={MS.sectionHeader}>
+          <Text style={MS.sectionIcon}>🔔</Text>
+          <Text style={MS.sectionLabel}>{t("eventModal.reminders")}</Text>
+        </View>
+        <View style={MS.chipRow}>
+          {REMINDER_PRESETS.map(({ minutes, label }) => {
+            const selected = selectedReminders.includes(minutes);
+            return (
+              <Button
+                key={minutes}
+                mode={selected ? "contained" : "outlined"}
+                compact
+                onPress={() => {
+                  if (selected) {
+                    setSelectedReminders((prev) =>
+                      prev.filter((m) => m !== minutes),
+                    );
+                  } else if (selectedReminders.length < 3) {
+                    setSelectedReminders((prev) => [...prev, minutes]);
+                  }
+                }}
+                style={MS.chip}
+                labelStyle={MS.chipLabel}
+                buttonColor={selected ? C.selectBg : undefined}
+                textColor={selected ? C.selectText : C.textSecondary}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* ── Actions ── */}
       <View style={MS.actions}>
-        <Button onPress={onDismiss}>{t("cancel")}</Button>
-        <Button mode="contained" onPress={handleSubmit(doSubmit)}>
+        <Button
+          mode="outlined"
+          onPress={onDismiss}
+          style={MS.cancelBtn}
+          labelStyle={MS.cancelLabel}
+        >
+          {t("cancel")}
+        </Button>
+        <Button
+          mode="contained"
+          onPress={handleSubmit(doSubmit)}
+          style={MS.saveBtn}
+          labelStyle={MS.saveBtnLabel}
+        >
           {editBlock ? t("save") : t("add")}
         </Button>
       </View>
