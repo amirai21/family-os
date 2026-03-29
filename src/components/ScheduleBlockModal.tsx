@@ -17,7 +17,7 @@ import { C, S, R } from "@src/ui/tokens";
 import { hhmmToMinutes, minutesToHHMM } from "@src/utils/time";
 import { dayOfWeekFromYMD, toYMD } from "@src/utils/date";
 import { t, dayNameShort, blockTypeLabel } from "@src/i18n";
-import { MS } from "@src/ui/modalStyles";
+import { MS, SEGMENT_THEME, SEGMENT_COLORS } from "@src/ui/modalStyles";
 import ModalWrapper from "./ModalWrapper";
 import WheelTimePicker from "./WheelTimePicker";
 
@@ -227,18 +227,23 @@ export default function ScheduleBlockModal({
         {t("blockModal.type")}
       </Text>
       <View style={MS.chipRow}>
-        {BLOCK_TYPES.map((bt) => (
-          <Button
-            key={bt.value}
-            mode={selectedType === bt.value ? "contained" : "outlined"}
-            compact
-            onPress={() => setValue("type", bt.value)}
-            style={MS.chip}
-            labelStyle={MS.chipLabel}
-          >
-            {blockTypeLabel(bt.value)}
-          </Button>
-        ))}
+        {BLOCK_TYPES.map((bt) => {
+          const sel = selectedType === bt.value;
+          return (
+            <Button
+              key={bt.value}
+              mode={sel ? "contained" : "outlined"}
+              compact
+              onPress={() => setValue("type", bt.value)}
+              style={MS.chip}
+              labelStyle={MS.chipLabel}
+              buttonColor={sel ? C.selectBg : undefined}
+              textColor={sel ? C.selectText : C.textSecondary}
+            >
+              {blockTypeLabel(bt.value)}
+            </Button>
+          );
+        })}
       </View>
 
       {/* Recurring / One-time toggle */}
@@ -246,10 +251,11 @@ export default function ScheduleBlockModal({
         value={isRecurring ? "recurring" : "oneTime"}
         onValueChange={(v) => setValue("isRecurring", v === "recurring")}
         buttons={[
-          { value: "recurring", label: t("blockModal.recurring") },
-          { value: "oneTime", label: t("blockModal.oneTime") },
+          { value: "recurring", label: t("blockModal.recurring"), ...SEGMENT_COLORS },
+          { value: "oneTime", label: t("blockModal.oneTime"), ...SEGMENT_COLORS },
         ]}
         style={MS.segmented}
+        theme={SEGMENT_THEME}
       />
 
       {/* Day of week — only for recurring */}
@@ -259,18 +265,23 @@ export default function ScheduleBlockModal({
             {t("blockModal.day")}
           </Text>
           <View style={MS.chipRow}>
-            {Array.from({ length: 7 }, (_, idx) => (
-              <Button
-                key={idx}
-                mode={selectedDay === idx ? "contained" : "outlined"}
-                compact
-                onPress={() => setValue("dayOfWeek", idx)}
-                style={MS.chip}
-                labelStyle={MS.chipLabel}
-              >
-                {dayNameShort(idx)}
-              </Button>
-            ))}
+            {Array.from({ length: 7 }, (_, idx) => {
+              const sel = selectedDay === idx;
+              return (
+                <Button
+                  key={idx}
+                  mode={sel ? "contained" : "outlined"}
+                  compact
+                  onPress={() => setValue("dayOfWeek", idx)}
+                  style={MS.chip}
+                  labelStyle={MS.chipLabel}
+                  buttonColor={sel ? C.selectBg : undefined}
+                  textColor={sel ? C.selectText : C.textSecondary}
+                >
+                  {dayNameShort(idx)}
+                </Button>
+              );
+            })}
           </View>
         </>
       )}
@@ -372,6 +383,8 @@ export default function ScheduleBlockModal({
               }}
               style={MS.chip}
               labelStyle={MS.chipLabel}
+              buttonColor={selected ? C.selectBg : undefined}
+              textColor={selected ? C.selectText : C.textSecondary}
             >
               {label}
             </Button>

@@ -14,7 +14,8 @@ import { useFamilyStore } from "@src/store/useFamilyStore";
 import { hhmmToMinutes, minutesToHHMM } from "@src/utils/time";
 import { dayOfWeekFromYMD, toYMD } from "@src/utils/date";
 import { t, dayNameShort, assigneeTypeLabel } from "@src/i18n";
-import { MS } from "@src/ui/modalStyles";
+import { MS, SEGMENT_THEME, SEGMENT_COLORS } from "@src/ui/modalStyles";
+import { C } from "@src/ui/tokens";
 import ModalWrapper from "./ModalWrapper";
 import WheelTimePicker from "./WheelTimePicker";
 import DatePicker, { formatDateHe } from "./DatePicker";
@@ -219,44 +220,55 @@ export default function FamilyEventModal({
           setValue("assigneeId", undefined);
         }}
         buttons={[
-          { value: "family", label: assigneeTypeLabel("family") },
-          { value: "member", label: assigneeTypeLabel("member") },
-          { value: "kid", label: assigneeTypeLabel("kid") },
+          { value: "family", label: assigneeTypeLabel("family"), ...SEGMENT_COLORS },
+          { value: "member", label: assigneeTypeLabel("member"), ...SEGMENT_COLORS },
+          { value: "kid", label: assigneeTypeLabel("kid"), ...SEGMENT_COLORS },
         ]}
         style={MS.segmented}
+        theme={SEGMENT_THEME}
       />
 
       {assigneeType === "member" && activeMembers.length > 0 && (
         <View style={MS.chipRow}>
-          {activeMembers.map((member) => (
-            <Button
-              key={member.id}
-              mode={assigneeId === member.id ? "contained" : "outlined"}
-              compact
-              onPress={() => setValue("assigneeId", member.id)}
-              style={MS.chip}
-              labelStyle={MS.chipLabel}
-            >
-              {member.avatarEmoji ?? ""} {member.name}
-            </Button>
-          ))}
+          {activeMembers.map((member) => {
+            const sel = assigneeId === member.id;
+            return (
+              <Button
+                key={member.id}
+                mode={sel ? "contained" : "outlined"}
+                compact
+                onPress={() => setValue("assigneeId", member.id)}
+                style={MS.chip}
+                labelStyle={MS.chipLabel}
+                buttonColor={sel ? C.selectBg : undefined}
+                textColor={sel ? C.selectText : C.textSecondary}
+              >
+                {member.avatarEmoji ?? ""} {member.name}
+              </Button>
+            );
+          })}
         </View>
       )}
 
       {assigneeType === "kid" && activeKids.length > 0 && (
         <View style={MS.chipRow}>
-          {activeKids.map((kid) => (
-            <Button
-              key={kid.id}
-              mode={assigneeId === kid.id ? "contained" : "outlined"}
-              compact
-              onPress={() => setValue("assigneeId", kid.id)}
-              style={MS.chip}
-              labelStyle={MS.chipLabel}
-            >
-              {kid.emoji}{"  "}{kid.name}
-            </Button>
-          ))}
+          {activeKids.map((kid) => {
+            const sel = assigneeId === kid.id;
+            return (
+              <Button
+                key={kid.id}
+                mode={sel ? "contained" : "outlined"}
+                compact
+                onPress={() => setValue("assigneeId", kid.id)}
+                style={MS.chip}
+                labelStyle={MS.chipLabel}
+                buttonColor={sel ? C.selectBg : undefined}
+                textColor={sel ? C.selectText : C.textSecondary}
+              >
+                {kid.emoji}{"  "}{kid.name}
+              </Button>
+            );
+          })}
         </View>
       )}
 
@@ -264,28 +276,34 @@ export default function FamilyEventModal({
         value={isRecurring ? "recurring" : "oneTime"}
         onValueChange={(v) => setValue("isRecurring", v === "recurring")}
         buttons={[
-          { value: "recurring", label: t("eventModal.recurring") },
-          { value: "oneTime", label: t("eventModal.oneTime") },
+          { value: "recurring", label: t("eventModal.recurring"), ...SEGMENT_COLORS },
+          { value: "oneTime", label: t("eventModal.oneTime"), ...SEGMENT_COLORS },
         ]}
         style={MS.segmented}
+        theme={SEGMENT_THEME}
       />
 
       {isRecurring && (
         <>
           <Text style={MS.label}>{t("eventModal.day")}</Text>
           <View style={MS.chipRow}>
-            {Array.from({ length: 7 }, (_, idx) => (
-              <Button
-                key={idx}
-                mode={selectedDay === idx ? "contained" : "outlined"}
-                compact
-                onPress={() => setValue("dayOfWeek", idx)}
-                style={MS.chip}
-                labelStyle={MS.chipLabel}
-              >
-                {dayNameShort(idx)}
-              </Button>
-            ))}
+            {Array.from({ length: 7 }, (_, idx) => {
+              const sel = selectedDay === idx;
+              return (
+                <Button
+                  key={idx}
+                  mode={sel ? "contained" : "outlined"}
+                  compact
+                  onPress={() => setValue("dayOfWeek", idx)}
+                  style={MS.chip}
+                  labelStyle={MS.chipLabel}
+                  buttonColor={sel ? C.selectBg : undefined}
+                  textColor={sel ? C.selectText : C.textSecondary}
+                >
+                  {dayNameShort(idx)}
+                </Button>
+              );
+            })}
           </View>
         </>
       )}
@@ -361,6 +379,8 @@ export default function FamilyEventModal({
               }}
               style={MS.chip}
               labelStyle={MS.chipLabel}
+              buttonColor={selected ? C.selectBg : undefined}
+              textColor={selected ? C.selectText : C.textSecondary}
             >
               {label}
             </Button>

@@ -21,6 +21,7 @@ import { Text, ProgressBar } from "react-native-paper";
 import type { Project } from "@src/models/project";
 import { t, statusLabel } from "@src/i18n";
 import { RTL_ROW } from "@src/ui/rtl";
+import { S } from "@src/ui/tokens";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -119,7 +120,8 @@ export default function ActiveProjectsCarousel({
         snapToInterval={SNAP_INTERVAL}
         decelerationRate="fast"
         contentContainerStyle={{
-          paddingHorizontal: sideInset - GAP / 2,
+          paddingStart: S.lg,
+          paddingEnd: S.lg,
         }}
         onMomentumScrollEnd={handleScrollEnd}
         // Flip scroll direction for RTL on web
@@ -241,6 +243,7 @@ function AddCard({
 const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 24,
+    marginHorizontal: -S.lg,
     overflow: "visible",
   },
 
