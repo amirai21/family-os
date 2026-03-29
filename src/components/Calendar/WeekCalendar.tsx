@@ -1,25 +1,20 @@
 /**
- * WeekCalendar — 7-column week strip with event lists inside each day.
+ * WeekCalendar — 7-column time-grid view.
  *
- * Each day column shows:
- *   - Short day name + day number (circle for today / selected)
- *   - Up to MAX_EVENTS colored event chips (family events + kid blocks)
- *   - "+N" overflow indicator when there are more
+ * Shows a scrollable grid with:
+ *   - Hour labels on the left axis (07:00–21:00)
+ *   - 7 day columns with events as positioned colored blocks
+ *   - Overlapping events rendered side-by-side
  *
- * Event data is pulled directly from the Zustand store.
- *
- * Props mirror MonthCalendar for drop-in usage:
- *   selectedDate  – "YYYY-MM-DD"
- *   onSelectDate  – callback with "YYYY-MM-DD"
- *   markedDates   – kept for API compat but unused (real events shown instead)
- *   accentColor   – tint for selected / today highlight
+ * Props mirror MonthCalendar for drop-in usage.
  */
 
 import React, { useMemo, useCallback } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Platform } from "react-native";
 import { Text, IconButton } from "react-native-paper";
 import he from "@src/i18n/he";
 import { LOCALE } from "@src/i18n";
+import { minutesToHHMM } from "@src/utils/time";
 import {
   useFamilyEventRecurringByDay,
   useFamilyEventOneTimeBlocks,
@@ -29,7 +24,7 @@ import {
   useAllKidOneTimeBlocks,
 } from "@src/store/scheduleSelectors";
 import { useFamilyStore } from "@src/store/useFamilyStore";
-import { RTL_ROW } from "@src/ui/rtl";
+import { C, S, R } from "@src/ui/tokens";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +39,7 @@ interface Props {
   onSelectDate: (date: string) => void;
   markedDates?: Record<string, MarkedDate>; // kept for API compat
   accentColor?: string;
+  onEventPress?: (id: string, source: "event" | "block") => void;
 }
 
 interface EventItem {
@@ -51,6 +47,15 @@ interface EventItem {
   title: string;
   color: string;
   startMinutes: number;
+  endMinutes: number;
+  source: "event" | "block";
+  icon: string; // kid emoji or "👨‍👩‍👧‍👦" for family
+}
+
+// Overlap layout info
+interface LayoutedEvent extends EventItem {
+  column: number; // 0-indexed column within overlap group
+  totalColumns: number; // total columns in overlap group
 }
 
 // ---------------------------------------------------------------------------
@@ -61,9 +66,15 @@ const DEFAULT_ACCENT = "#6C63FF";
 const FAMILY_COLOR = "#4ECDC4";
 const KID_COLOR = "#FF6B6B";
 const MEMBER_COLOR = "#6C63FF";
-const MAX_EVENTS = 8;
 
-const DAY_LABELS = he.calendarDays; // ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"] Sun–Sat
+const DAY_LABELS = he.calendarDays; // ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"]
+
+const GRID_START_HOUR = 7;
+const GRID_END_HOUR = 21;
+const HOUR_HEIGHT = 60;
+const TIME_LABEL_WIDTH = 36;
+const DAY_NUM_SIZE = 28;
+const GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -77,11 +88,10 @@ function ymd(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** Return Sunday of the week containing dateStr. */
 function startOfWeek(dateStr: string): Date {
   const [y, m, d] = dateStr.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() - date.getDay()); // back to Sunday
+  date.setDate(date.getDate() - date.getDay());
   return date;
 }
 
@@ -92,6 +102,68 @@ function addDays(date: Date, days: number): Date {
 }
 
 // ---------------------------------------------------------------------------
+// Overlap layout algorithm
+// ---------------------------------------------------------------------------
+
+function layoutEvents(events: EventItem[]): LayoutedEvent[] {
+  if (events.length === 0) return [];
+
+  const sorted = [...events].sort((a, b) => a.startMinutes - b.startMinutes || a.endMinutes - b.endMinutes);
+  const result: LayoutedEvent[] = [];
+
+  // Track end times per column to assign columns
+  const columns: number[] = []; // columns[i] = endMinutes of the event in column i
+
+  for (const ev of sorted) {
+    // Find the first column where this event fits (no overlap)
+    let col = -1;
+    for (let c = 0; c < columns.length; c++) {
+      if (columns[c] <= ev.startMinutes) {
+        col = c;
+        break;
+      }
+    }
+    if (col === -1) {
+      col = columns.length;
+      columns.push(0);
+    }
+    columns[col] = ev.endMinutes;
+    result.push({ ...ev, column: col, totalColumns: 0 }); // totalColumns set later
+  }
+
+  // Group overlapping events and set totalColumns
+  // Events overlap if any pair in the group has overlapping time ranges
+  const groups: number[][] = []; // indices into result
+  for (let i = 0; i < result.length; i++) {
+    let placed = false;
+    for (const group of groups) {
+      const overlaps = group.some((gi) => {
+        const a = result[gi];
+        const b = result[i];
+        return a.startMinutes < b.endMinutes && b.startMinutes < a.endMinutes;
+      });
+      if (overlaps) {
+        group.push(i);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      groups.push([i]);
+    }
+  }
+
+  for (const group of groups) {
+    const maxCol = Math.max(...group.map((i) => result[i].column)) + 1;
+    for (const i of group) {
+      result[i].totalColumns = maxCol;
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -99,13 +171,13 @@ export default function WeekCalendar({
   selectedDate,
   onSelectDate,
   accentColor = DEFAULT_ACCENT,
+  onEventPress,
 }: Props) {
-  // ── Week navigation ────────────────────────────────────────────────────────
+  // ── Week navigation ──
   const [weekOffset, setWeekOffset] = React.useState(0);
 
   const baseWeekStart = useMemo(() => startOfWeek(selectedDate), [selectedDate]);
 
-  // Reset offset whenever the selected date jumps to a different week
   React.useEffect(() => {
     setWeekOffset(0);
   }, [ymd(baseWeekStart)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -126,7 +198,6 @@ export default function WeekCalendar({
   const goBack = useCallback(() => setWeekOffset((o) => o - 1), []);
   const goForward = useCallback(() => setWeekOffset((o) => o + 1), []);
 
-  // Week range label: "1–7 ביוני 2025" or "30 מאי – 5 יוני 2025"
   const weekLabel = useMemo(() => {
     const start = days[0];
     const end = days[6];
@@ -139,16 +210,16 @@ export default function WeekCalendar({
     return `${s} – ${e}`;
   }, [days]);
 
-  // ── Event data (pulled from store) ─────────────────────────────────────────
+  // ── Event data ──
   const familyRecurringByDow = useFamilyEventRecurringByDay();
   const familyOneTimeEvents = useFamilyEventOneTimeBlocks();
   const kidRecurringByDow = useAllKidRecurringByDay();
   const kidOneTimeBlocks = useAllKidOneTimeBlocks();
   const kids = useFamilyStore((s) => s.kids);
+  const familyMembers = useFamilyStore((s) => s.familyMembers);
 
-  // Build EventItem[] for every day of the visible week
-  const weekEvents = useMemo<Record<string, EventItem[]>>(() => {
-    const result: Record<string, EventItem[]> = {};
+  const weekEvents = useMemo<Record<string, LayoutedEvent[]>>(() => {
+    const result: Record<string, LayoutedEvent[]> = {};
     for (const day of days) {
       const dow = day.getDay();
       const dateStr = ymd(day);
@@ -156,6 +227,11 @@ export default function WeekCalendar({
 
       // Family – recurring
       for (const e of familyRecurringByDow[dow] ?? []) {
+        const icon = e.assigneeType === "kid" && e.assigneeId
+          ? (kids.find((k) => k.id === e.assigneeId)?.emoji ?? "👨‍👩‍👧‍👦")
+          : e.assigneeType === "member" && e.assigneeId
+            ? (familyMembers.find((m) => m.id === e.assigneeId)?.avatarEmoji ?? "👤")
+            : "👨‍👩‍👧‍👦";
         items.push({
           id: e.id,
           title: e.title,
@@ -167,11 +243,19 @@ export default function WeekCalendar({
                 ? MEMBER_COLOR
                 : KID_COLOR),
           startMinutes: e.startMinutes,
+          endMinutes: e.endMinutes,
+          source: "event",
+          icon,
         });
       }
       // Family – one-time
       for (const e of familyOneTimeEvents) {
         if (e.date === dateStr) {
+          const icon = e.assigneeType === "kid" && e.assigneeId
+            ? (kids.find((k) => k.id === e.assigneeId)?.emoji ?? "👨‍👩‍👧‍👦")
+            : e.assigneeType === "member" && e.assigneeId
+              ? (familyMembers.find((m) => m.id === e.assigneeId)?.avatarEmoji ?? "👤")
+              : "👨‍👩‍👧‍👦";
           items.push({
             id: e.id,
             title: e.title,
@@ -183,6 +267,9 @@ export default function WeekCalendar({
                   ? MEMBER_COLOR
                   : KID_COLOR),
             startMinutes: e.startMinutes,
+            endMinutes: e.endMinutes,
+            source: "event",
+            icon,
           });
         }
       }
@@ -194,6 +281,9 @@ export default function WeekCalendar({
           title: b.title,
           color: b.color ?? kid?.color ?? KID_COLOR,
           startMinutes: b.startMinutes,
+          endMinutes: b.endMinutes,
+          source: "block",
+          icon: kid?.emoji ?? "👶",
         });
       }
       // Kid blocks – one-time
@@ -205,19 +295,29 @@ export default function WeekCalendar({
             title: b.title,
             color: b.color ?? kid?.color ?? KID_COLOR,
             startMinutes: b.startMinutes,
+            endMinutes: b.endMinutes,
+            source: "block",
+            icon: kid?.emoji ?? "👶",
           });
         }
       }
 
-      result[dateStr] = items.sort((a, b) => a.startMinutes - b.startMinutes);
+      result[dateStr] = layoutEvents(items);
     }
     return result;
-  }, [days, familyRecurringByDow, familyOneTimeEvents, kidRecurringByDow, kidOneTimeBlocks, kids]);
+  }, [days, familyRecurringByDow, familyOneTimeEvents, kidRecurringByDow, kidOneTimeBlocks, kids, familyMembers]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Hour labels ──
+  const hours = useMemo(() => {
+    const h: number[] = [];
+    for (let i = GRID_START_HOUR; i <= GRID_END_HOUR; i++) h.push(i);
+    return h;
+  }, []);
+
+  // ── Render ──
   return (
     <View style={styles.root}>
-      {/* ── Header: chevron  week-range  chevron ─────────────────────────── */}
+      {/* Header: chevron  week-range  chevron */}
       <View style={styles.header}>
         <IconButton icon="chevron-right" size={22} onPress={goForward} />
         <Text variant="titleMedium" style={styles.weekLabel}>
@@ -226,29 +326,20 @@ export default function WeekCalendar({
         <IconButton icon="chevron-left" size={22} onPress={goBack} />
       </View>
 
-      {/* ── Day columns ──────────────────────────────────────────────────── */}
-      <View style={styles.columnsRow}>
+      {/* Day headers */}
+      <View style={styles.dayHeaderRow}>
+        <View style={styles.timeLabelSpacer} />
         {days.map((day, i) => {
           const dateStr = ymd(day);
           const isSelected = dateStr === selectedDate;
           const isToday = dateStr === today;
-          const events = weekEvents[dateStr] ?? [];
-          const visible = events.slice(0, MAX_EVENTS);
-          const overflow = events.length - MAX_EVENTS;
-
           return (
             <Pressable
               key={i}
-              style={[
-                styles.dayCol,
-                isSelected && { backgroundColor: accentColor + "18" },
-              ]}
+              style={styles.dayHeaderCell}
               onPress={() => onSelectDate(dateStr)}
             >
-              {/* Day-of-week label */}
               <Text style={styles.dowLabel}>{DAY_LABELS[i]}</Text>
-
-              {/* Day number circle */}
               <View
                 style={[
                   styles.dayNumCircle,
@@ -269,27 +360,89 @@ export default function WeekCalendar({
                   {day.getDate()}
                 </Text>
               </View>
-
-              {/* Events list */}
-              <View style={styles.eventsList}>
-                {visible.map((ev) => (
-                  <View key={ev.id} style={styles.eventChip}>
-                    <View
-                      style={[styles.eventStripe, { backgroundColor: ev.color }]}
-                    />
-                    <Text style={styles.eventTitle} numberOfLines={1}>
-                      {ev.title}
-                    </Text>
-                  </View>
-                ))}
-                {overflow > 0 && (
-                  <Text style={styles.overflowText}>+{overflow}</Text>
-                )}
-              </View>
             </Pressable>
           );
         })}
       </View>
+
+      {/* Time grid (scrollable) */}
+      <ScrollView style={styles.gridScroll} nestedScrollEnabled>
+        <View style={styles.gridContainer}>
+          {/* Hour rows — gridlines + labels */}
+          {hours.map((hour) => {
+            const top = (hour - GRID_START_HOUR) * HOUR_HEIGHT;
+            return (
+              <View key={hour} style={[styles.hourRow, { top }]}>
+                <Text style={styles.hourLabel}>
+                  {pad(hour)}:00
+                </Text>
+                <View style={styles.hourLine} />
+              </View>
+            );
+          })}
+
+          {/* Day columns with events */}
+          <View style={styles.dayColumnsContainer}>
+            <View style={styles.timeLabelSpacer} />
+            {days.map((day, i) => {
+              const dateStr = ymd(day);
+              const isSelected = dateStr === selectedDate;
+              const events = weekEvents[dateStr] ?? [];
+              return (
+                <Pressable
+                  key={i}
+                  style={[
+                    styles.dayColumn,
+                    isSelected && { backgroundColor: accentColor + "0A" },
+                    i < 6 && styles.dayColumnBorder,
+                  ]}
+                  onPress={() => onSelectDate(dateStr)}
+                >
+                  {events.map((ev) => {
+                    const clampedStart = Math.max(ev.startMinutes, GRID_START_HOUR * 60);
+                    const clampedEnd = Math.min(ev.endMinutes, GRID_END_HOUR * 60);
+                    const top = ((clampedStart - GRID_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                    const height = Math.max(
+                      ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT,
+                      18,
+                    );
+                    const widthPercent = 100 / ev.totalColumns;
+                    const leftPercent = ev.column * widthPercent;
+
+                    return (
+                      <Pressable
+                        key={ev.id}
+                        style={({ hovered }: any) => [
+                          styles.eventBlock,
+                          {
+                            top,
+                            height,
+                            left: `${leftPercent}%` as any,
+                            width: `${widthPercent - 2}%` as any,
+                            backgroundColor: hovered ? ev.color + "40" : ev.color + "28",
+                            borderLeftColor: ev.color,
+                          },
+                        ]}
+                        onPress={() => onEventPress?.(ev.id, ev.source)}
+                        {...(Platform.OS === "web" ? { onClick: (e: any) => e.stopPropagation() } as any : {})}
+                      >
+                        <Text style={[styles.eventTitle, { color: ev.color }]} numberOfLines={1}>
+                          {ev.icon} {ev.title}
+                        </Text>
+                        {height > 28 && (
+                          <Text style={styles.eventTime} numberOfLines={1}>
+                            {minutesToHHMM(ev.startMinutes)} – {minutesToHHMM(ev.endMinutes)}
+                          </Text>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -297,8 +450,6 @@ export default function WeekCalendar({
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
-
-const DAY_NUM_SIZE = 28;
 
 const styles = StyleSheet.create({
   root: { paddingBottom: 4 },
@@ -308,86 +459,119 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   weekLabel: {
     fontWeight: "700",
-    color: "#1A1A2E",
+    color: C.textPrimary,
     textAlign: "center",
     flex: 1,
   },
 
-  // 7-column row — flexDirection: "row" so RN Web RTL auto-mirrors it
-  // (Sunday renders on the right, Saturday on the left — correct for Hebrew)
-  columnsRow: {
+  // Day header row
+  dayHeaderRow: {
     flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
   },
-
-  dayCol: {
+  timeLabelSpacer: {
+    width: TIME_LABEL_WIDTH,
+  },
+  dayHeaderCell: {
     flex: 1,
-    minHeight: 230,
-    paddingHorizontal: 2,
-    paddingBottom: 8,
-    borderRadius: 8,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: "#E8E4FF",
+    alignItems: "center",
+    paddingVertical: 2,
   },
-
   dowLabel: {
     textAlign: "center",
     fontSize: 10,
-    color: "#8E8BA8",
+    color: C.textMuted,
     fontWeight: "600",
-    marginTop: 6,
     marginBottom: 2,
   },
-
   dayNumCircle: {
     width: DAY_NUM_SIZE,
     height: DAY_NUM_SIZE,
     borderRadius: DAY_NUM_SIZE / 2,
-    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 5,
   },
   dayNum: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#1A1A2E",
+    color: C.textPrimary,
     textAlign: "center",
   },
   dayNumSelected: { color: "#FFFFFF", fontWeight: "700" },
 
-  // Events inside each column
-  eventsList: {
-    gap: 2,
+  // Grid
+  gridScroll: {
+    height: 400, // visible portion, scrollable
   },
-  eventChip: {
-    flexDirection: RTL_ROW,
-    alignItems: "center",
-    backgroundColor: "#F8F7FF",
-    borderRadius: 3,
-    overflow: "hidden",
-    minHeight: 17,
+  gridContainer: {
+    height: GRID_HEIGHT,
+    position: "relative",
   },
-  eventStripe: {
-    width: 3,
-    alignSelf: "stretch",
-    minHeight: 17,
+
+  // Hour rows
+  hourRow: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    height: HOUR_HEIGHT,
   },
-  eventTitle: {
-    flex: 1,
+  hourLabel: {
+    width: TIME_LABEL_WIDTH,
     fontSize: 9,
-    color: "#3A3A5C",
+    color: C.textMuted,
+    textAlign: "center",
+    marginTop: -6,
+  },
+  hourLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: C.border,
+  },
+
+  // Day columns overlay
+  dayColumnsContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: GRID_HEIGHT,
+    flexDirection: "row",
+  },
+  dayColumn: {
+    flex: 1,
+    position: "relative",
+  },
+  dayColumnBorder: {
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: C.border,
+  },
+
+  // Event blocks
+  eventBlock: {
+    position: "absolute",
+    borderLeftWidth: 3,
+    borderRadius: 4,
     paddingHorizontal: 3,
     paddingVertical: 2,
-    fontWeight: "500",
+    overflow: "hidden",
+    marginRight: 1,
+    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
   },
-  overflowText: {
+  eventTitle: {
     fontSize: 9,
-    color: "#8E8BA8",
-    textAlign: "center",
-    marginTop: 1,
+    fontWeight: "700",
+    lineHeight: 12,
+  },
+  eventTime: {
+    fontSize: 8,
+    color: C.textSecondary,
+    lineHeight: 10,
   },
 });

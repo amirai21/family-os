@@ -12,6 +12,8 @@ import { z } from "zod";
 
 import type { ScheduleBlock, BlockType } from "@src/models/schedule";
 import { BLOCK_TYPES } from "@src/models/schedule";
+import { useFamilyStore } from "@src/store/useFamilyStore";
+import { C, S, R } from "@src/ui/tokens";
 import { hhmmToMinutes, minutesToHHMM } from "@src/utils/time";
 import { dayOfWeekFromYMD, toYMD } from "@src/utils/date";
 import { t, dayNameShort, blockTypeLabel } from "@src/i18n";
@@ -111,6 +113,8 @@ export default function ScheduleBlockModal({
   defaultDate,
   onSubmit,
 }: Props) {
+  const kids = useFamilyStore((s) => s.kids);
+  const editKid = editBlock ? kids.find((k) => k.id === editBlock.kidId) : undefined;
   const [selectedReminders, setSelectedReminders] = useState<number[]>([]);
 
   const {
@@ -190,6 +194,13 @@ export default function ScheduleBlockModal({
       <Text variant="titleLarge" style={MS.heading}>
         {editBlock ? t("blockModal.editTitle") : t("blockModal.addTitle")}
       </Text>
+
+      {editKid && (
+        <View style={{ flexDirection: "row-reverse", alignItems: "center", marginBottom: S.md, gap: S.sm }}>
+          <Text style={{ fontSize: 20 }}>{editKid.emoji}</Text>
+          <Text style={{ fontSize: 14, fontWeight: "600", color: editKid.color }}>{editKid.name}</Text>
+        </View>
+      )}
 
       {/* Title */}
       <Controller

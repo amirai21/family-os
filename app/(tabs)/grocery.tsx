@@ -60,6 +60,7 @@ export default function GroceryScreen() {
           onValueChange={(v) => setSelectedCategory(v as ShoppingCategory)}
           buttons={segmentButtons}
           style={styles.segments}
+          theme={{ colors: { secondaryContainer: "#D6ECFA", onSecondaryContainer: "#1A6DB0" } }}
         />
 
         {/* Item count + clear all */}
