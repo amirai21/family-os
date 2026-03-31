@@ -60,7 +60,8 @@ export const groceryRepo = {
         target: groceryItems.id,
         set: {
           title: sql`excluded.title`,
-          category: sql`excluded.category`,
+          shoppingCategory: sql`excluded.shopping_category`,
+          subcategory: sql`excluded.subcategory`,
           qty: sql`excluded.qty`,
           isBought: sql`excluded.is_bought`,
           updatedAt: new Date(),
