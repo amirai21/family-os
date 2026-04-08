@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Platform } from "react-native";
 import {
   Text,
@@ -6,6 +6,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import type { Note } from "@src/models/note";
 import type { Chore } from "@src/models/chore";
@@ -167,11 +168,18 @@ export default function HomeScreen() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [kidModalOpen, setKidModalOpen] = useState(false);
   const [editingKid, setEditingKid] = useState<Kid | null>(null);
+  const [showAllNotes, setShowAllNotes] = useState(false);
+
+  // Reset expanded notes when navigating back to home
+  useFocusEffect(useCallback(() => { setShowAllNotes(false); }, []));
 
   // Notes sorted: pinned first
   const sortedNotes = [...notes].sort(
     (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)
   );
+  const NOTES_LIMIT = 5;
+  const visibleNotes = showAllNotes ? sortedNotes : sortedNotes.slice(0, NOTES_LIMIT);
+  const hasMoreNotes = sortedNotes.length > NOTES_LIMIT;
 
   // Chores split
   const selectedChores = chores.filter((c) => c.selectedForToday);
@@ -267,7 +275,7 @@ export default function HomeScreen() {
           )}
 
           <View style={styles.notesGrid}>
-            {sortedNotes.map((note) => (
+            {visibleNotes.map((note) => (
               <Pressable
                 key={note.id}
                 style={({ pressed, hovered }: any) => [
@@ -321,6 +329,17 @@ export default function HomeScreen() {
               </Pressable>
             ))}
           </View>
+
+          {hasMoreNotes && !showAllNotes && (
+            <Pressable
+              style={styles.showAllNotesBtn}
+              onPress={() => setShowAllNotes(true)}
+            >
+              <Text style={styles.showAllNotesLabel}>
+                {t("home.showAllNotes", { count: sortedNotes.length })}
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {/* -- Chores -- */}
@@ -703,6 +722,22 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: NOTE_COLORS.barDefault,
     marginTop: S.md,
+  },
+  showAllNotesBtn: {
+    alignSelf: "center",
+    paddingVertical: S.sm + 2,
+    paddingHorizontal: S.xl,
+    borderRadius: R.md,
+    backgroundColor: NOTE_COLORS.bg,
+    borderWidth: 1,
+    borderColor: NOTE_COLORS.border,
+    marginTop: S.sm,
+  },
+  showAllNotesLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: NOTE_COLORS.accent,
+    textAlign: "center",
   },
 
   // Chores

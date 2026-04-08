@@ -116,5 +116,6 @@ function resetFamilyData() {
   store.setScheduleBlocks([]);
   store.setFamilyMembers([]);
   store.setFamilyEvents([]);
+  store.setOnboardingComplete(false);
   clearFamilyCache();
 }

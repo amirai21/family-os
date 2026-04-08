@@ -54,6 +54,7 @@ const he = {
     title: "בית",
     notes: "פתקים",
     noNotes: "אין עדיין פתקים — לחצו על + כדי לרשום משהו",
+    showAllNotes: "הצג את כל הפתקים ({{count}})",
     note: "פתק",
     chores: "מטלות",
     selectedForToday: "נבחרו להיום",
@@ -346,6 +347,34 @@ const he = {
     kidName: "שם",
     kidEmoji: "אימוג׳י",
     kidColor: "צבע",
+    telegram: "טלגרם",
+    telegramTitle: "עוזר משפחתי בטלגרם",
+    telegramSubtitle:
+      "קבלו עדכונים ושאלו שאלות על לוח הזמנים, המטלות והקניות של המשפחה — ישירות מטלגרם.\nכל בן משפחה יכול לחבר את הטלגרם שלו בנפרד.",
+    connectTelegram: "חבר טלגרם",
+    telegramError: "שגיאה ביצירת קוד חיבור",
+  },
+
+  // ── Onboarding ──
+  onboarding: {
+    welcome: "ברוכים הבאים!",
+    step1Title: "איך קוראים למשפחה?",
+    step1Subtitle: "השם הזה יופיע בראש המסכים",
+    step2Title: "מי במשפחה?",
+    step2Subtitle: "הוסיפו את ההורים ומנהלי הבית",
+    step3Title: "ומי הילדים?",
+    step3Subtitle: "הוסיפו את הילדים שיופיעו במערכת",
+    step4Title: "עוזר משפחתי בטלגרם",
+    step4Subtitle:
+      "קבלו עדכונים ושאלו שאלות ישירות מטלגרם.\nאפשר לחבר גם מאוחר יותר מההגדרות.",
+    next: "הבא",
+    back: "חזרה",
+    finish: "סיום",
+    addMember: "הוסף חבר/ת משפחה",
+    addKid: "הוסף ילד/ה",
+    familyNamePlaceholder: "למשל: כהן",
+    atLeastOneMember: "יש להוסיף לפחות חבר/ת משפחה אחד/ת",
+    atLeastOneKid: "יש להוסיף לפחות ילד/ה אחד/ת",
   },
 } as const;
 

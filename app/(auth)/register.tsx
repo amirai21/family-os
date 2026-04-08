@@ -26,7 +26,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register({ username, password });
-      router.replace("/(tabs)/today");
+      // AuthGate handles redirect to /(tabs)/today once status is loggedIn
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg === "USERNAME_TAKEN") setError(t("auth.usernameTaken"));

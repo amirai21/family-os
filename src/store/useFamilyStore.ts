@@ -29,10 +29,16 @@ interface FamilyState {
   familyMembers: FamilyMember[];
   familyEvents: FamilyEvent[];
 
+  // Onboarding
+  onboardingComplete: boolean;
+
   // Sync metadata
   syncStatus: SyncStatus;
   syncError: string | null;
   lastSyncedAt: number | null;
+
+  // Onboarding
+  setOnboardingComplete: (val: boolean) => void;
 
   // Family name
   setFamilyName: (name: string) => void;
@@ -170,9 +176,15 @@ export const useFamilyStore = create<FamilyState>()(
       familyMembers: [],
       familyEvents: [],
 
+      onboardingComplete: false,
+
       syncStatus: "idle" as SyncStatus,
       syncError: null,
       lastSyncedAt: null,
+
+      /* ── Onboarding ── */
+
+      setOnboardingComplete: (val) => set({ onboardingComplete: val }),
 
       /* ── Family name ── */
 
@@ -490,7 +502,7 @@ export const useFamilyStore = create<FamilyState>()(
     }),
     {
       name: "family-os-store-v2",
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         familyName: state.familyName,
@@ -503,6 +515,7 @@ export const useFamilyStore = create<FamilyState>()(
         familyMembers: state.familyMembers,
         familyEvents: state.familyEvents,
         lastSyncedAt: state.lastSyncedAt,
+        onboardingComplete: state.onboardingComplete,
       }),
       migrate: (persisted: any, version: number) => {
         if (version < 2) {
@@ -569,6 +582,10 @@ export const useFamilyStore = create<FamilyState>()(
             ...e,
             daysOfWeek: e.daysOfWeek ?? (e.dayOfWeek != null ? [e.dayOfWeek] : [0]),
           }));
+        }
+        if (version < 10) {
+          // Add onboardingComplete flag
+          persisted.onboardingComplete = persisted.onboardingComplete ?? false;
         }
         return persisted;
       },
