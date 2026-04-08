@@ -19,6 +19,7 @@ import { pullAll } from "@src/lib/sync/syncEngine";
 import { setSyncErrorHandler } from "@src/lib/sync/remoteCrud";
 import { registerForPushNotifications } from "@src/lib/notifications/registerPushToken";
 import { t } from "@src/i18n";
+import OnboardingWizard from "@src/components/OnboardingWizard";
 
 // ── RTL bootstrap (runs once at module load, before any render) ──
 if (!I18nManager.isRTL) {
@@ -95,6 +96,11 @@ export default function RootLayout() {
     pullAll(authFamilyId)
       .then(() => {
         console.log("[sync] Pull succeeded");
+        // Auto-complete onboarding for existing users who already have data
+        const s = useFamilyStore.getState();
+        if (!s.onboardingComplete && (s.familyMembers.length > 0 || s.kids.length > 0)) {
+          s.setOnboardingComplete(true);
+        }
       })
       .catch((err) => {
         console.warn("[sync] Initial pull failed:", err.message);
@@ -109,6 +115,8 @@ export default function RootLayout() {
     });
   }, [authStatus, authFamilyId]);
 
+  const onboardingComplete = useFamilyStore((s) => s.onboardingComplete);
+
   // Hide splash once fonts are loaded, store hydrated, and auth resolved
   const ready = fontsLoaded && hydrated && authStatus !== "booting";
   useEffect(() => {
@@ -119,6 +127,8 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
+  const showOnboarding = authStatus === "loggedIn" && !onboardingComplete;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PaperProvider theme={theme}>
@@ -128,6 +138,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
         </Stack>
+        {showOnboarding && <OnboardingWizard />}
         <StatusBar style="dark" />
         <Snackbar
           visible={snackVisible}

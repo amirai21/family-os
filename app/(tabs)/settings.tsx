@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Linking, Alert } from "react-native";
 import { Card, Text, IconButton, Divider, TextInput, Button } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFamilyStore } from "@src/store/useFamilyStore";
@@ -9,6 +9,8 @@ import {
   setKidActiveRemote,
   updateFamilyNameRemote,
 } from "@src/lib/sync/remoteCrud";
+import { telegramApi } from "@src/lib/api/endpoints";
+import { getFamilyId } from "@src/lib/familyContext";
 import FamilyMemberModal from "@src/components/FamilyMemberModal";
 import KidModal from "@src/components/KidModal";
 import type { FamilyMember } from "@src/models/familyMember";
@@ -139,6 +141,22 @@ export default function SettingsScreen() {
   const [kidModalOpen, setKidModalOpen] = useState(false);
   const [editingKid, setEditingKid] = useState<Kid | null>(null);
   const [showArchivedKids, setShowArchivedKids] = useState(false);
+
+  const [connectingTelegram, setConnectingTelegram] = useState(false);
+
+  const connectTelegram = async () => {
+    setConnectingTelegram(true);
+    try {
+      const familyId = await getFamilyId();
+      const { code } = await telegramApi.generateCode(familyId);
+      const deepLink = `https://t.me/family_os_assistant_bot?start=${code}`;
+      await Linking.openURL(deepLink);
+    } catch {
+      Alert.alert(t("settings.telegramError"));
+    } finally {
+      setConnectingTelegram(false);
+    }
+  };
 
   const activeMembers = familyMembers.filter((m) => m.isActive);
   const archivedMembers = familyMembers.filter((m) => !m.isActive);
@@ -302,6 +320,30 @@ export default function SettingsScreen() {
           </Card.Content>
         </Card>
 
+        {/* ── Telegram Assistant card ── */}
+        <SectionHeader label={t("settings.telegram")} />
+        <Card style={styles.card} mode="elevated">
+          <Card.Content>
+            <Text style={styles.telegramTitle}>
+              {t("settings.telegramTitle")} 🤖
+            </Text>
+            <Text style={styles.subtitle}>
+              {t("settings.telegramSubtitle")}
+            </Text>
+            <Button
+              mode="contained"
+              onPress={connectTelegram}
+              loading={connectingTelegram}
+              disabled={connectingTelegram}
+              icon="send"
+              style={styles.telegramBtn}
+              buttonColor={C.selectText}
+            >
+              {t("settings.connectTelegram")}
+            </Button>
+          </Card.Content>
+        </Card>
+
         {/* ── Account card ── */}
         <SectionHeader label={t("auth.account")} />
         <Card style={styles.card} mode="elevated">
@@ -402,4 +444,12 @@ const styles = StyleSheet.create({
   accountInfo: { marginBottom: S.md },
   accountText: { fontSize: 14, textAlign: "right", writingDirection: "rtl", color: C.textPrimary, marginBottom: S.xs },
   logoutBtn: { borderColor: C.red + "44", borderRadius: R.md },
+  telegramTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.textPrimary,
+    textAlign: "right",
+    marginBottom: S.sm,
+  },
+  telegramBtn: { borderRadius: R.md, marginTop: S.md },
 });

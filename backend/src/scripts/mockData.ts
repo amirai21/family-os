@@ -1,22 +1,32 @@
 /**
- * mockData.ts — Populate a family with rich mock data for demo/testing.
+ * mockData.ts — Populate a family with randomized mock data for testing.
  *
  * Usage:
- *   npm run db:mock -- <familyId>
+ *   npm run db:mock -- <familyId> [options]
  *
- * What it inserts:
- *   - 2 parent family members
- *   - 3 kids (with recurring schedule blocks)
- *   - 15 grocery items (mix of bought / unbought)
- *   - 12 chores (mix of done / pending / selected-for-today)
- *   - 6 projects (across idea / in_progress / done)
- *   - 5 notes (2 pinned)
- *   - 8 family events (recurring + one-time)
+ * Options:
+ *   --skip-members       Don't create family members (use existing ones)
+ *   --skip-kids          Don't create kids (use existing ones)
+ *   --only <types>       Comma-separated list of what to seed (e.g. grocery,events)
+ *                        Valid: members,kids,schedule,events,chores,grocery,notes,projects
+ *   --kids N             Number of kids to create (default: 3)
+ *   --chores N           Number of chores (default: 8)
+ *   --grocery N          Number of grocery items (default: 12)
+ *   --notes N            Number of notes (default: 4)
+ *   --projects N         Number of projects (default: 3)
+ *   --events N           Number of family events (default: 6)
+ *   --kid-events N       Events per kid (default: 3)
+ *   --schedule N         Schedule blocks per kid (default: 4)
  *
- * Safe to run multiple times — always appends new rows.
+ * Examples:
+ *   npm run db:mock -- <familyId>                              # Full mock (members + kids + data)
+ *   npm run db:mock -- <familyId> --skip-members --skip-kids   # Only events/tasks for existing setup
+ *   npm run db:mock -- <familyId> --only grocery,events        # Only grocery + events (uses existing members/kids)
+ *   npm run db:mock -- <familyId> --skip-kids --chores 15      # Members + lots of chores, keep existing kids
  */
 
 import { db } from "../db/client.js";
+import { eq } from "drizzle-orm";
 import {
   familyMembers,
   kids,
@@ -29,13 +39,447 @@ import {
 } from "../db/schema.js";
 
 // ---------------------------------------------------------------------------
+// CLI argument parsing
+// ---------------------------------------------------------------------------
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const familyId = args[0];
+
+  if (!familyId || familyId.startsWith("--")) {
+    console.error("❌  Usage: npm run db:mock -- <familyId> [options]");
+    console.error("   Options: --skip-members --skip-kids --kids N --chores N --grocery N");
+    console.error("            --notes N --projects N --events N --kid-events N --schedule N");
+    process.exit(1);
+  }
+
+  const getFlag = (name: string) => args.includes(`--${name}`);
+  const getStr = (name: string): string | undefined => {
+    const idx = args.indexOf(`--${name}`);
+    return idx !== -1 && args[idx + 1] ? args[idx + 1] : undefined;
+  };
+  const getNum = (name: string, def: number) => {
+    const idx = args.indexOf(`--${name}`);
+    return idx !== -1 && args[idx + 1] ? parseInt(args[idx + 1], 10) : def;
+  };
+
+  // --only grocery,events → only seed those types
+  const onlyRaw = getStr("only");
+  const only = onlyRaw ? new Set(onlyRaw.split(",").map((s) => s.trim())) : null;
+
+  // When --only is used, skip members/kids unless explicitly included
+  const skipMembers = getFlag("skip-members") || (only !== null && !only.has("members"));
+  const skipKids = getFlag("skip-kids") || (only !== null && !only.has("kids"));
+
+  return {
+    familyId,
+    skipMembers,
+    skipKids,
+    only,
+    numKids: getNum("kids", 3),
+    numChores: getNum("chores", 8),
+    numGrocery: getNum("grocery", 20),
+    numNotes: getNum("notes", 4),
+    numProjects: getNum("projects", 3),
+    numFamilyEvents: getNum("events", 6),
+    numKidEvents: getNum("kid-events", 3),
+    numSchedulePerKid: getNum("schedule", 4),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Minutes from HH:MM string, e.g. "08:30" → 510 */
-function t(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
+function pick<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(n, arr.length));
+}
+
+function choice<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomTimeRange(
+  earliest = 420,
+  latest = 1200,
+  minDur = 30,
+  maxDur = 150,
+): { start: number; end: number } {
+  const start = earliest + Math.floor(Math.random() * (latest - earliest));
+  const dur = minDur + Math.floor(Math.random() * (maxDur - minDur));
+  return { start, end: Math.min(start + dur, 1380) };
+}
+
+/** Format YYYY-MM-DD offset from today */
+function dateOffset(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// Data pools (Hebrew, realistic for Israeli families)
+// ---------------------------------------------------------------------------
+
+const KID_NAMES = ["עידו", "נועה", "יעל", "אורי", "מיכל", "תומר", "שירה", "אלון", "דניאל", "מאיה"];
+const KID_EMOJIS = ["🧒", "👧", "👦", "👶", "🧒🏻", "👧🏻", "👦🏻", "🐣"];
+const COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#FF8C42", "#6C5CE7"];
+
+const FAMILY_EVENT_TITLES = [
+  "ארוחת שישי משפחתית", "ביקור סבא וסבתא", "טיול משפחתי", "קניות שבועיות",
+  "סידורים בבנק", "ביקור חברים", "יום כיף משפחתי", "ניקיון כללי",
+  "אסיפת הורים", "אירוע בית ספר", "שוק איכרים", "ערב סרטים משפחתי",
+  "פיקניק בפארק", "ביקור בגן חיות",
+];
+
+const KID_EVENT_TITLES = [
+  "ביקור רופא", "ביקור רופא שיניים", "בדיקת שמיעה", "יום ספורט",
+  "טיול שנתי", "הצגה בבית ספר", "יום הולדת חבר", "חוג מוזיקה",
+  "תחרות שחייה", "מסיבת כיתה", "בדיקת עיניים", "מפגש עם חברים",
+];
+
+const SCHEDULE_SCHOOLS = ["בית ספר", "גן ילדים", "צהרון"];
+const SCHEDULE_ACTIVITIES = [
+  "חוג כדורגל", "חוג בלט", "חוג ציור", "שיעור פסנתר",
+  "חוג שחייה", "חוג קראטה", "חוג דרמה", "חוג רובוטיקה",
+  "יוגה לילדים", "חוג מחשבים", "חוג גיטרה", "חוג ג׳ודו",
+];
+
+const CHORE_TITLES = [
+  "לשטוף כלים", "לנקות חדר אמבטיה", "לסדר את הסלון", "לקפל כביסה",
+  "לשאוב אבק", "להוציא זבל", "לנקות מטבח", "לסדר חדר שינה",
+  "לגזום את הגינה", "לנקות חלונות", "לארגן את המחסן", "לתלות כביסה",
+  "לקנות קניות", "להכין ארוחת ערב", "לאסוף ילדים", "לשלם חשבונות",
+  "להחליף מצעים", "לתקן ברז מטפטף",
+];
+
+const GROCERY_POOL: { title: string; qty: string; category: string; subcategory: string }[] = [
+  // grocery — Produce
+  { title: "עגבניות", qty: "1 ק\"ג", category: "grocery", subcategory: "Produce" },
+  { title: "מלפפונים", qty: "500 גרם", category: "grocery", subcategory: "Produce" },
+  { title: "בצל", qty: "שקית", category: "grocery", subcategory: "Produce" },
+  { title: "תפוחי אדמה", qty: "2 ק\"ג", category: "grocery", subcategory: "Produce" },
+  { title: "תפוחים", qty: "1 ק\"ג", category: "grocery", subcategory: "Produce" },
+  { title: "בננות", qty: "אשכול", category: "grocery", subcategory: "Produce" },
+  // grocery — Dairy
+  { title: "חלב", qty: "2 ליטר", category: "grocery", subcategory: "Dairy" },
+  { title: "ביצים", qty: "תבנית", category: "grocery", subcategory: "Dairy" },
+  { title: "גבינה צהובה", qty: "200 גרם", category: "grocery", subcategory: "Dairy" },
+  { title: "יוגורט", qty: "6 יחידות", category: "grocery", subcategory: "Dairy" },
+  // grocery — Meat & Fish
+  { title: "עוף שלם", qty: "1", category: "grocery", subcategory: "Meat" },
+  { title: "כרעיים", qty: "1 ק\"ג", category: "grocery", subcategory: "Meat" },
+  { title: "פילה סלמון", qty: "400 גרם", category: "grocery", subcategory: "Fish" },
+  { title: "פילה אמנון", qty: "500 גרם", category: "grocery", subcategory: "Fish" },
+  // grocery — Bakery
+  { title: "לחם", qty: "2 כיכרות", category: "grocery", subcategory: "Bakery" },
+  { title: "חלה", qty: "1", category: "grocery", subcategory: "Bakery" },
+  // grocery — Frozen
+  { title: "ירקות קפואים", qty: "שקית", category: "grocery", subcategory: "Frozen" },
+  { title: "בורקס", qty: "חבילה", category: "grocery", subcategory: "Frozen" },
+  // grocery — Snacks
+  { title: "שקדים", qty: "200 גרם", category: "grocery", subcategory: "Snacks" },
+  { title: "ביסלי", qty: "2 שקיות", category: "grocery", subcategory: "Snacks" },
+  // grocery — Beverages
+  { title: "מיץ תפוזים", qty: "1 ליטר", category: "grocery", subcategory: "Beverages" },
+  { title: "מים מינרליים", qty: "שישיית בקבוקים", category: "grocery", subcategory: "Beverages" },
+  // grocery — Pantry & Other
+  { title: "פסטה", qty: "500 גרם", category: "grocery", subcategory: "Other" },
+  { title: "אורז", qty: "חבילה", category: "grocery", subcategory: "Other" },
+  { title: "רסק עגבניות", qty: "2 קופסאות", category: "grocery", subcategory: "Other" },
+  { title: "שמן זית", qty: "בקבוק", category: "grocery", subcategory: "Other" },
+  { title: "טונה", qty: "3 קופסאות", category: "grocery", subcategory: "Other" },
+  { title: "חומוס", qty: "2 קופסאות", category: "grocery", subcategory: "Other" },
+
+  // health
+  { title: "אקמול", qty: "חבילה", category: "health", subcategory: "Medications" },
+  { title: "נורופן לילדים", qty: "בקבוק", category: "health", subcategory: "Medications" },
+  { title: "ויטמין D", qty: "1", category: "health", subcategory: "Vitamins" },
+  { title: "מולטי ויטמין", qty: "צנצנת", category: "health", subcategory: "Vitamins" },
+  { title: "משחת שיניים", qty: "2 שפופרות", category: "health", subcategory: "PersonalCare" },
+  { title: "דאודורנט", qty: "1", category: "health", subcategory: "PersonalCare" },
+  { title: "חיתולים", qty: "חבילה גדולה", category: "health", subcategory: "BabyCare" },
+  { title: "מגבונים לחים", qty: "3 חבילות", category: "health", subcategory: "BabyCare" },
+  { title: "פלסטרים", qty: "חבילה", category: "health", subcategory: "FirstAid" },
+  { title: "קרם הגנה", qty: "בקבוק", category: "health", subcategory: "Skincare" },
+  { title: "קרם לחות", qty: "1", category: "health", subcategory: "Skincare" },
+  { title: "שמפו", qty: "בקבוק", category: "health", subcategory: "HairCare" },
+
+  // home
+  { title: "אקונומיקה", qty: "בקבוק", category: "home", subcategory: "Cleaning" },
+  { title: "סבון כלים", qty: "בקבוק", category: "home", subcategory: "Kitchen" },
+  { title: "נייר טואלט", qty: "חבילת 24", category: "home", subcategory: "PaperGoods" },
+  { title: "מגבות נייר", qty: "6 גלילים", category: "home", subcategory: "PaperGoods" },
+  { title: "אבקת כביסה", qty: "קופסה", category: "home", subcategory: "Laundry" },
+  { title: "מרכך כביסה", qty: "בקבוק", category: "home", subcategory: "Laundry" },
+  { title: "שקיות זבל", qty: "גליל", category: "home", subcategory: "Kitchen" },
+  { title: "ספוגים למטבח", qty: "חבילה", category: "home", subcategory: "Kitchen" },
+  { title: "סבון ידיים", qty: "2 בקבוקים", category: "home", subcategory: "Bathroom" },
+  { title: "סוללות AA", qty: "חבילת 8", category: "home", subcategory: "Tools" },
+  { title: "נרות ריחניים", qty: "2", category: "home", subcategory: "Decor" },
+];
+
+const NOTE_POOL: { title: string; body: string; pinned: boolean }[] = [
+  { title: "📌 רשימת מטלות לסוף שבוע", body: "לסדר את המחסן\nלגזום את הגינה\nלצבוע את הגדר", pinned: true },
+  { title: "רעיונות לטיול", body: "פארק הירקון, מוזיאון הילדים, חוף פלמחים, גן חיות", pinned: false },
+  { title: "📌 טלפונים חשובים", body: "רופא משפחה: 03-1234567\nרופא שיניים: 03-7654321\nבית הספר: 03-9876543", pinned: true },
+  { title: "מתכון — פשטידת ירקות", body: "4 ביצים, 1 קישוא, 1 גזר, גבינה צהובה, פירורי לחם\nלערבב, 200°C, 35 דקות", pinned: false },
+  { title: "רשימת מתנות ליום הולדת", body: "לגו, ספר, משחק קופסה, כדור כדורגל", pinned: false },
+  { title: "📌 תזכורת: חידוש ביטוח", body: "לחדש ביטוח רכב עד סוף החודש\nלבדוק הצעות אחרות", pinned: true },
+  { title: "רעיונות לגינה", body: "לשתול עגבניות, בזיליקום ומנטה. לקנות אדניות חדשות", pinned: false },
+];
+
+const PROJECT_POOL: { title: string; description: string; status: "idea" | "in_progress" | "done"; progress: number }[] = [
+  { title: "שיפוץ מטבח", description: "החלפת ארונות ומשטחי עבודה", status: "in_progress", progress: 35 },
+  { title: "גינה חדשה", description: "עיצוב ושתילת גינת ירק ותבלינים", status: "idea", progress: 0 },
+  { title: "חדר משחקים לילדים", description: "הפיכת חדר אורחים לחדר משחקים", status: "in_progress", progress: 60 },
+  { title: "ארגון מחסן", description: "מיון, סידור ומכירת דברים מיותרים", status: "idea", progress: 10 },
+  { title: "אלבום משפחתי", description: "דיגיטציה של תמונות ישנות ויצירת אלבום", status: "in_progress", progress: 20 },
+  { title: "חופשת קיץ", description: "בחירת יעד, הזמנת טיסות ומלון", status: "idea", progress: 5 },
+  { title: "החלפת מחשב המשפחה", description: "מחקר ורכישת מחשב נייד חדש", status: "done", progress: 100 },
+  { title: "קורס אנגלית לילדים", description: "לרשום את הילדים לקורס אנגלית קיץ", status: "idea", progress: 0 },
+];
+
+const LOCATIONS = [
+  "קופת חולים", "בית הספר", "מרכז קהילתי", "פארק הירקון",
+  "מוזיאון ילדים", "בריכת שחייה", "אולם ספורט", "סטודיו יוגה",
+  "בית סבא וסבתא", "שוק הכרמל", "גן חיות",
+];
+
+// ---------------------------------------------------------------------------
+// Seed functions
+// ---------------------------------------------------------------------------
+
+type MemberInfo = { id: string; displayName: string };
+type KidInfo = { id: string; name: string; color: string };
+
+async function seedMembers(familyId: string): Promise<MemberInfo[]> {
+  const rows = await db
+    .insert(familyMembers)
+    .values([
+      { familyId, displayName: "אמא", role: "parent", color: "#FF6B6B", avatarEmoji: "👩", isActive: true },
+      { familyId, displayName: "אבא", role: "parent", color: "#6C63FF", avatarEmoji: "👨", isActive: true },
+    ])
+    .returning();
+  console.log(`  👩👨  Created ${rows.length} family members`);
+  return rows.map((r) => ({ id: r.id, displayName: r.displayName }));
+}
+
+async function fetchExistingMembers(familyId: string): Promise<MemberInfo[]> {
+  const rows = await db
+    .select({ id: familyMembers.id, displayName: familyMembers.displayName })
+    .from(familyMembers)
+    .where(eq(familyMembers.familyId, familyId));
+  console.log(`  👩👨  Using ${rows.length} existing family members`);
+  if (rows.length === 0) {
+    console.error("❌  No family members found. Remove --skip-members or add members first.");
+    process.exit(1);
+  }
+  return rows;
+}
+
+async function seedKids(familyId: string, count: number): Promise<KidInfo[]> {
+  const names = pick(KID_NAMES, count);
+  const values = names.map((name, i) => ({
+    familyId,
+    name,
+    color: COLORS[i % COLORS.length],
+    emoji: KID_EMOJIS[i % KID_EMOJIS.length],
+    isActive: true,
+  }));
+  const rows = await db.insert(kids).values(values).returning();
+  console.log(`  🧒  Created ${rows.length} kids: ${rows.map((r) => r.name).join(", ")}`);
+  return rows.map((r) => ({ id: r.id, name: r.name, color: r.color ?? COLORS[0] }));
+}
+
+async function fetchExistingKids(familyId: string): Promise<KidInfo[]> {
+  const rows = await db
+    .select({ id: kids.id, name: kids.name, color: kids.color })
+    .from(kids)
+    .where(eq(kids.familyId, familyId));
+  console.log(`  🧒  Using ${rows.length} existing kids: ${rows.map((r) => r.name).join(", ")}`);
+  if (rows.length === 0) {
+    console.error("❌  No kids found. Remove --skip-kids or add kids first.");
+    process.exit(1);
+  }
+  return rows;
+}
+
+async function seedScheduleBlocks(familyId: string, kidList: KidInfo[], perKid: number) {
+  const values: (typeof scheduleBlocks.$inferInsert)[] = [];
+
+  for (const kid of kidList) {
+    // School: Sun-Thu (days 0-4)
+    const schoolTitle = choice(SCHEDULE_SCHOOLS);
+    const schoolStart = choice([450, 465, 480]); // 7:30, 7:45, 8:00
+    const schoolEnd = choice([780, 795, 810, 840]); // 13:00-14:00
+    for (let day = 0; day < 5; day++) {
+      values.push({
+        familyId,
+        kidId: kid.id,
+        daysOfWeek: [day],
+        title: schoolTitle,
+        type: "school",
+        startMinutes: schoolStart,
+        endMinutes: schoolEnd,
+        isRecurring: true,
+      });
+    }
+
+    // Activities
+    const activities = pick(SCHEDULE_ACTIVITIES, Math.max(perKid - 1, 1));
+    for (let i = 0; i < activities.length; i++) {
+      const day = i % 5; // Spread across weekdays
+      const start = choice([900, 960, 990, 1020, 1050]); // 15:00-17:30
+      values.push({
+        familyId,
+        kidId: kid.id,
+        daysOfWeek: [day],
+        title: activities[i],
+        type: "hobby",
+        startMinutes: start,
+        endMinutes: start + choice([60, 90]),
+        location: choice(LOCATIONS),
+        color: kid.color,
+        isRecurring: true,
+      });
+    }
+  }
+
+  await db.insert(scheduleBlocks).values(values);
+  console.log(`  📅  Inserted ${values.length} schedule blocks`);
+}
+
+async function seedFamilyEvents(
+  familyId: string,
+  memberList: MemberInfo[],
+  kidList: KidInfo[],
+  numFamily: number,
+  numPerKid: number,
+) {
+  const values: (typeof familyEvents.$inferInsert)[] = [];
+
+  // Recurring family events
+  const familyTitles = pick(FAMILY_EVENT_TITLES, numFamily);
+  for (let i = 0; i < familyTitles.length; i++) {
+    const { start, end } = randomTimeRange();
+    values.push({
+      familyId,
+      title: familyTitles[i],
+      assigneeType: "family",
+      daysOfWeek: [i % 7],
+      startMinutes: start,
+      endMinutes: end,
+      location: Math.random() > 0.3 ? choice(LOCATIONS) : undefined,
+      color: choice(COLORS),
+      isRecurring: true,
+    });
+  }
+
+  // One-time kid events spread over next 3 weeks
+  for (const kid of kidList) {
+    const titles = pick(KID_EVENT_TITLES, numPerKid);
+    for (let i = 0; i < titles.length; i++) {
+      const daysAhead = 1 + Math.floor(Math.random() * 21); // 1-21 days from now
+      const date = dateOffset(daysAhead);
+      const dayOfWeek = new Date(date).getDay();
+      const { start, end } = randomTimeRange(540, 1080, 30, 120);
+      values.push({
+        familyId,
+        title: `${titles[i]} — ${kid.name}`,
+        assigneeType: "kid",
+        assigneeId: kid.id,
+        daysOfWeek: [dayOfWeek],
+        startMinutes: start,
+        endMinutes: end,
+        location: Math.random() > 0.4 ? choice(LOCATIONS) : undefined,
+        color: kid.color,
+        isRecurring: false,
+        date,
+      });
+    }
+  }
+
+  // A few member events
+  for (const member of memberList) {
+    const daysAhead = 1 + Math.floor(Math.random() * 14);
+    const date = dateOffset(daysAhead);
+    const dayOfWeek = new Date(date).getDay();
+    const { start, end } = randomTimeRange(360, 1080, 60, 120);
+    values.push({
+      familyId,
+      title: `אירוע — ${member.displayName}`,
+      assigneeType: "member",
+      assigneeId: member.id,
+      daysOfWeek: [dayOfWeek],
+      startMinutes: start,
+      endMinutes: end,
+      color: choice(COLORS),
+      isRecurring: false,
+      date,
+    });
+  }
+
+  await db.insert(familyEvents).values(values);
+  console.log(`  📆  Inserted ${values.length} family events (${familyTitles.length} recurring, ${values.length - familyTitles.length} one-time)`);
+}
+
+async function seedChores(familyId: string, memberList: MemberInfo[], count: number) {
+  const titles = pick(CHORE_TITLES, count);
+  const values = titles.map((title) => {
+    const member = Math.random() > 0.2 ? choice(memberList) : null;
+    const done = Math.random() < 0.25;
+    return {
+      familyId,
+      title,
+      assignedTo: member?.displayName ?? undefined,
+      assignedToMemberId: member?.id ?? undefined,
+      done,
+      selectedForToday: !done && Math.random() < 0.4,
+    };
+  });
+  await db.insert(chores).values(values);
+  console.log(`  ✅  Inserted ${values.length} chores`);
+}
+
+async function seedGrocery(familyId: string, count: number) {
+  const items = pick(GROCERY_POOL, count);
+  const values = items.map((item) => ({
+    familyId,
+    title: item.title,
+    qty: item.qty,
+    shoppingCategory: item.category,
+    subcategory: item.subcategory,
+    isBought: Math.random() < 0.25,
+  }));
+  await db.insert(groceryItems).values(values);
+  console.log(`  🛒  Inserted ${values.length} grocery items`);
+}
+
+async function seedNotes(familyId: string, count: number) {
+  const items = pick(NOTE_POOL, count);
+  const values = items.map((n) => ({
+    familyId,
+    title: n.title,
+    body: n.body,
+    pinned: n.pinned,
+  }));
+  await db.insert(notes).values(values);
+  console.log(`  📝  Inserted ${values.length} notes`);
+}
+
+async function seedProjects(familyId: string, count: number) {
+  const items = pick(PROJECT_POOL, count);
+  const values = items.map((p) => ({
+    familyId,
+    title: p.title,
+    description: p.description,
+    status: p.status,
+    progress: p.progress,
+  }));
+  await db.insert(projects).values(values);
+  console.log(`  📁  Inserted ${values.length} projects`);
 }
 
 // ---------------------------------------------------------------------------
@@ -43,206 +487,41 @@ function t(hhmm: string): number {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const familyId = process.argv[2];
-  if (!familyId) {
-    console.error("❌  Usage: npm run db:mock -- <familyId>");
-    process.exit(1);
-  }
+  const cfg = parseArgs();
 
-  console.log(`🎭  Inserting mock data for family ${familyId}…\n`);
+  const should = (type: string) => cfg.only === null || cfg.only.has(type);
 
-  // ── Family members (parents) ──────────────────────────────────────────────
-  const [mom, dad] = await db
-    .insert(familyMembers)
-    .values([
-      {
-        familyId,
-        displayName: "אמא",
-        role: "parent",
-        color: "#FF6B6B",
-        avatarEmoji: "👩",
-        isActive: true,
-      },
-      {
-        familyId,
-        displayName: "אבא",
-        role: "parent",
-        color: "#6C63FF",
-        avatarEmoji: "👨",
-        isActive: true,
-      },
-    ])
-    .returning();
+  console.log(`\n🎭  Seeding mock data for family ${cfg.familyId}…`);
+  if (cfg.only) console.log(`    (--only: ${[...cfg.only].join(", ")})`);
+  if (cfg.skipMembers) console.log(`    (skipping member creation — using existing)`);
+  if (cfg.skipKids) console.log(`    (skipping kid creation — using existing)`);
+  console.log();
 
-  console.log(`  👩  Family member: ${mom.displayName} (${mom.id})`);
-  console.log(`  👨  Family member: ${dad.displayName} (${dad.id})`);
+  // Members — needed if events/chores/schedule are requested
+  const needMembers = should("members") || should("events") || should("chores");
+  const memberList = needMembers
+    ? cfg.skipMembers
+      ? await fetchExistingMembers(cfg.familyId)
+      : await seedMembers(cfg.familyId)
+    : [];
 
-  // ── Kids ──────────────────────────────────────────────────────────────────
-  const [noa, ido, yael] = await db
-    .insert(kids)
-    .values([
-      { familyId, name: "נועה", color: "#FF6B6B", emoji: "🌸", isActive: true },
-      { familyId, name: "עידו", color: "#4ECDC4", emoji: "🚀", isActive: true },
-      { familyId, name: "יעל", color: "#FFA726", emoji: "🦋", isActive: true },
-    ])
-    .returning();
+  // Kids — needed if events/schedule are requested
+  const needKids = should("kids") || should("events") || should("schedule");
+  const kidList = needKids
+    ? cfg.skipKids
+      ? await fetchExistingKids(cfg.familyId)
+      : await seedKids(cfg.familyId, cfg.numKids)
+    : [];
 
-  console.log(`  🌸  Kid: ${noa.name} (${noa.id})`);
-  console.log(`  🚀  Kid: ${ido.name} (${ido.id})`);
-  console.log(`  🦋  Kid: ${yael.name} (${yael.id})`);
+  // Data
+  if (should("schedule")) await seedScheduleBlocks(cfg.familyId, kidList, cfg.numSchedulePerKid);
+  if (should("events")) await seedFamilyEvents(cfg.familyId, memberList, kidList, cfg.numFamilyEvents, cfg.numKidEvents);
+  if (should("chores")) await seedChores(cfg.familyId, memberList, cfg.numChores);
+  if (should("grocery")) await seedGrocery(cfg.familyId, cfg.numGrocery);
+  if (should("notes")) await seedNotes(cfg.familyId, cfg.numNotes);
+  if (should("projects")) await seedProjects(cfg.familyId, cfg.numProjects);
 
-  // ── Schedule blocks ───────────────────────────────────────────────────────
-  // Sun=0 Mon=1 Tue=2 Wed=3 Thu=4 Fri=5 Sat=6
-  await db.insert(scheduleBlocks).values([
-    // Noa — school Sun–Thu, ballet Wed
-    { familyId, kidId: noa.id, daysOfWeek: [0], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, daysOfWeek: [1], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, daysOfWeek: [2], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, daysOfWeek: [3], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, daysOfWeek: [4], title: "בית ספר", type: "school", startMinutes: t("08:00"), endMinutes: t("13:30"), isRecurring: true },
-    { familyId, kidId: noa.id, daysOfWeek: [3], title: "בלט", type: "hobby", startMinutes: t("16:00"), endMinutes: t("17:30"), location: "אולפן ריקוד", color: "#FF6B6B", isRecurring: true },
-
-    // Ido — school Sun–Thu, football Tue+Thu
-    { familyId, kidId: ido.id, daysOfWeek: [0], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, daysOfWeek: [1], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, daysOfWeek: [2], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, daysOfWeek: [3], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, daysOfWeek: [4], title: "בית ספר", type: "school", startMinutes: t("07:45"), endMinutes: t("13:15"), isRecurring: true },
-    { familyId, kidId: ido.id, daysOfWeek: [2], title: "כדורגל", type: "hobby", startMinutes: t("17:00"), endMinutes: t("18:30"), location: "מגרש ספורט", color: "#4ECDC4", isRecurring: true },
-    { familyId, kidId: ido.id, daysOfWeek: [4], title: "כדורגל", type: "hobby", startMinutes: t("17:00"), endMinutes: t("18:30"), location: "מגרש ספורט", color: "#4ECDC4", isRecurring: true },
-
-    // Yael — kindergarten Sun–Thu, swimming Mon
-    { familyId, kidId: yael.id, daysOfWeek: [0], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, daysOfWeek: [1], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, daysOfWeek: [2], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, daysOfWeek: [3], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, daysOfWeek: [4], title: "גן ילדים", type: "school", startMinutes: t("08:00"), endMinutes: t("14:00"), isRecurring: true },
-    { familyId, kidId: yael.id, daysOfWeek: [1], title: "שחייה", type: "hobby", startMinutes: t("16:30"), endMinutes: t("17:30"), location: "בריכה עירונית", color: "#FFA726", isRecurring: true },
-  ]);
-
-  console.log(`  📅  Schedule blocks inserted`);
-
-  // ── Grocery items ─────────────────────────────────────────────────────────
-  await db.insert(groceryItems).values([
-    // Unbought
-    { familyId, title: "חלב", shoppingCategory: "grocery", subcategory: "מוצרי חלב", qty: "2 ליטר", isBought: false },
-    { familyId, title: "לחם", shoppingCategory: "grocery", subcategory: "מאפים", qty: "1 כיכר", isBought: false },
-    { familyId, title: "ביצים", shoppingCategory: "grocery", subcategory: "מוצרי חלב", qty: "12", isBought: false },
-    { familyId, title: "עגבניות", shoppingCategory: "grocery", subcategory: "ירקות", qty: "1 ק\"ג", isBought: false },
-    { familyId, title: "מלפפונים", shoppingCategory: "grocery", subcategory: "ירקות", qty: "500 גרם", isBought: false },
-    { familyId, title: "עוף שלם", shoppingCategory: "grocery", subcategory: "בשר ועוף", qty: "1", isBought: false },
-    { familyId, title: "גבינה צהובה", shoppingCategory: "grocery", subcategory: "מוצרי חלב", qty: "200 גרם", isBought: false },
-    { familyId, title: "שמן זית", shoppingCategory: "grocery", subcategory: "שמנים", qty: "1 בקבוק", isBought: false },
-    { familyId, title: "פסטה", shoppingCategory: "grocery", subcategory: "קטניות ודגנים", qty: "500 גרם", isBought: false },
-    { familyId, title: "רסק עגבניות", shoppingCategory: "grocery", subcategory: "שימורים", qty: "2 קופסאות", isBought: false },
-    // Bought
-    { familyId, title: "תפוחים", shoppingCategory: "grocery", subcategory: "פירות", qty: "1 ק\"ג", isBought: true },
-    { familyId, title: "יוגורט", shoppingCategory: "grocery", subcategory: "מוצרי חלב", qty: "4 יחידות", isBought: true },
-    { familyId, title: "מיץ תפוזים", shoppingCategory: "grocery", subcategory: "משקאות", qty: "1 ליטר", isBought: true },
-    { familyId, title: "שקדים", shoppingCategory: "grocery", subcategory: "חטיפים", qty: "200 גרם", isBought: true },
-    { familyId, title: "גרנולה", shoppingCategory: "grocery", subcategory: "ארוחת בוקר", qty: "1 חבילה", isBought: true },
-  ]);
-
-  console.log(`  🛒  Grocery items inserted`);
-
-  // ── Chores ────────────────────────────────────────────────────────────────
-  await db.insert(chores).values([
-    // Selected for today (mix done/pending)
-    { familyId, title: "לשטוף כלים", assignedTo: "אמא", assignedToMemberId: mom.id, done: true, selectedForToday: true },
-    { familyId, title: "לסדר את הסלון", assignedTo: "אבא", assignedToMemberId: dad.id, done: false, selectedForToday: true },
-    { familyId, title: "לקחת את יעל מהגן", assignedTo: "אמא", assignedToMemberId: mom.id, done: false, selectedForToday: true },
-    { familyId, title: "לקנות קניות", assignedTo: "אבא", assignedToMemberId: dad.id, done: false, selectedForToday: true },
-    { familyId, title: "לשאוב אבק", assignedTo: "אמא", assignedToMemberId: mom.id, done: true, selectedForToday: true },
-    // Not selected for today
-    { familyId, title: "לקפל כביסה", assignedTo: "אמא", assignedToMemberId: mom.id, done: false, selectedForToday: false },
-    { familyId, title: "לגזום את הגינה", assignedTo: "אבא", assignedToMemberId: dad.id, done: false, selectedForToday: false },
-    { familyId, title: "לנקות את חדר האמבטיה", done: false, selectedForToday: false },
-    { familyId, title: "להחליף מצעים", assignedTo: "אמא", assignedToMemberId: mom.id, done: false, selectedForToday: false },
-    { familyId, title: "לשלם חשבון חשמל", assignedTo: "אבא", assignedToMemberId: dad.id, done: true, selectedForToday: false },
-    { familyId, title: "לתקן ברז מטפטף", assignedTo: "אבא", assignedToMemberId: dad.id, done: false, selectedForToday: false },
-    { familyId, title: "לארגן את המחסן", done: false, selectedForToday: false },
-  ]);
-
-  console.log(`  ✅  Chores inserted`);
-
-  // ── Projects ──────────────────────────────────────────────────────────────
-  await db.insert(projects).values([
-    { familyId, title: "שיפוץ חדר ילדים", description: "צביעת הקירות, רהיטים חדשים לנועה ועידו", status: "in_progress", progress: 40 },
-    { familyId, title: "חופשת קיץ", description: "לתכנן טיול משפחתי לאילת בחודש יולי", status: "in_progress", progress: 20 },
-    { familyId, title: "גינון וחצר", description: "שתילת עצי פרי ושיפוץ אזור המשחקים", status: "idea", progress: 0 },
-    { familyId, title: "מסיבת יום הולדת לעידו", description: "יום הולדת 8 - לתאם מקום, אורחים ועוגה", status: "in_progress", progress: 65 },
-    { familyId, title: "החלפת מחשב המשפחה", description: "מחקר ורכישת מחשב נייד חדש לשימוש משפחתי", status: "done", progress: 100 },
-    { familyId, title: "קורס שפה לילדים", description: "לרשום את הילדים לקורס אנגלית קיץ", status: "idea", progress: 0 },
-  ]);
-
-  console.log(`  📁  Projects inserted`);
-
-  // ── Notes ─────────────────────────────────────────────────────────────────
-  await db.insert(notes).values([
-    { familyId, title: "📌 תזכורת שבועית", body: "ביום ראשון — לקחת את עידו לרופא שיניים בשעה 17:00\nביום שלישי — פגישת הורים בבית הספר של נועה", pinned: true },
-    { familyId, title: "🛒 לקנות בקרוב", body: "נעלי ספורט לעידו — מידה 33\nתיק בית ספר חדש לנועה\nבגדי ים ליעל לפני הקיץ", pinned: true },
-    { familyId, title: "טלפונים חשובים", body: "רופאת ילדים: 03-1234567\nגן יעל: 052-8765432\nבית ספר נועה ועידו: 03-9876543", pinned: false },
-    { familyId, title: "מתכון — פשטידת ירקות", body: "מצרכים: 4 ביצים, 1 קישוא, 1 גזר, גבינה צהובה, פירורי לחם\nלערבב הכול, לאפות 200 מעלות 35 דקות", pinned: false },
-    { familyId, title: "קודים ומנויים", body: "Netflix: חשבון משפחתי\nספוטיפיי: מנוי פרמיום\nוואי-פיי שכנים: לא לשכוח לשלם החודש", pinned: false },
-  ]);
-
-  console.log(`  📝  Notes inserted`);
-
-  // ── Family events ─────────────────────────────────────────────────────────
-  await db.insert(familyEvents).values([
-    // Recurring weekly
-    { familyId, title: "ארוחת שבת משפחתית", assigneeType: "family", daysOfWeek: [5], startMinutes: t("19:00"), endMinutes: t("21:00"), location: "בית סבא וסבתא", color: "#FFD700", isRecurring: true },
-    { familyId, title: "ספורט בוקר — אבא", assigneeType: "member", assigneeId: dad.id, daysOfWeek: [0], startMinutes: t("06:30"), endMinutes: t("07:30"), location: "חדר כושר", color: "#6C63FF", isRecurring: true },
-    { familyId, title: "יוגה — אמא", assigneeType: "member", assigneeId: mom.id, daysOfWeek: [2], startMinutes: t("09:00"), endMinutes: t("10:00"), location: "סטודיו יוגה", color: "#FF6B6B", isRecurring: true },
-    { familyId, title: "שיעור פרטי בחשבון — נועה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [1], startMinutes: t("16:00"), endMinutes: t("17:00"), color: "#FF6B6B", isRecurring: true },
-    { familyId, title: "ערב הורים + ילדים", assigneeType: "family", daysOfWeek: [4], startMinutes: t("19:30"), endMinutes: t("21:00"), location: "בית", color: "#4ECDC4", isRecurring: true },
-    // One-time upcoming (existing)
-    { familyId, title: "ביקור רופא — עידו", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [0], startMinutes: t("17:00"), endMinutes: t("17:45"), location: "קופת חולים", color: "#4ECDC4", isRecurring: false, date: "2026-03-22" },
-    { familyId, title: "פגישת הורים — בית ספר", assigneeType: "family", daysOfWeek: [2], startMinutes: t("18:00"), endMinutes: t("19:30"), location: "בית ספר רמות", color: "#FFD700", isRecurring: false, date: "2026-03-25" },
-    { familyId, title: "יום הולדת — סבתא חנה", assigneeType: "family", daysOfWeek: [6], startMinutes: t("12:00"), endMinutes: t("16:00"), location: "בית סבתא", color: "#FF6B6B", isRecurring: false, date: "2026-03-28" },
-  ]);
-
-  // ── Standalone one-time events — next 3 weeks ─────────────────────────────
-  await db.insert(familyEvents).values([
-    // --- נועה ---
-    { familyId, title: "בדיקת עיניים — נועה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [4], startMinutes: t("15:30"), endMinutes: t("16:15"), location: "קופת חולים", color: "#FF6B6B", isRecurring: false, date: "2026-03-19" },
-    { familyId, title: "מסיבת יום הולדת — חברה של נועה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [4], startMinutes: t("16:00"), endMinutes: t("18:30"), location: "אולם אירועים", color: "#FF6B6B", isRecurring: false, date: "2026-03-26" },
-    { familyId, title: "טיול שנתי — בית ספר", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [5], startMinutes: t("07:30"), endMinutes: t("15:00"), location: "נחל אלכסנדר", color: "#FF6B6B", isRecurring: false, date: "2026-04-03" },
-    { familyId, title: "הצגת ילדים — תאטרון הבימה", assigneeType: "kid", assigneeId: noa.id, daysOfWeek: [2], startMinutes: t("18:00"), endMinutes: t("19:30"), location: "תאטרון הבימה", color: "#FF6B6B", isRecurring: false, date: "2026-04-07" },
-
-    // --- עידו ---
-    { familyId, title: "גמר כדורגל עירוני", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [5], startMinutes: t("10:00"), endMinutes: t("11:30"), location: "מגרש ספורט אזורי", color: "#4ECDC4", isRecurring: false, date: "2026-03-20" },
-    { familyId, title: "🎉 יום הולדת עידו!", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [2], startMinutes: t("17:00"), endMinutes: t("20:00"), location: "בית", color: "#4ECDC4", isRecurring: false, date: "2026-03-31" },
-    { familyId, title: "רופא שיניים — עידו", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [4], startMinutes: t("15:00"), endMinutes: t("15:45"), location: "קליניקת שיניים", color: "#4ECDC4", isRecurring: false, date: "2026-04-02" },
-    { familyId, title: "מפגש עם ירדן", assigneeType: "kid", assigneeId: ido.id, daysOfWeek: [1], startMinutes: t("16:00"), endMinutes: t("18:00"), color: "#4ECDC4", isRecurring: false, date: "2026-04-06" },
-
-    // --- יעל ---
-    { familyId, title: "בדיקת שמיעה — יעל", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [3], startMinutes: t("09:30"), endMinutes: t("10:15"), location: "קופת חולים", color: "#FFA726", isRecurring: false, date: "2026-03-18" },
-    { familyId, title: "יום גיבורים בגן — יעל", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [2], startMinutes: t("09:00"), endMinutes: t("11:30"), color: "#FFA726", isRecurring: false, date: "2026-03-24" },
-    { familyId, title: "טיול גן — מוזיאון ילדים", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [3], startMinutes: t("09:30"), endMinutes: t("13:00"), location: "מוזיאון ילדים", color: "#FFA726", isRecurring: false, date: "2026-04-01" },
-    { familyId, title: "יום כיף בפארק — יעל", assigneeType: "kid", assigneeId: yael.id, daysOfWeek: [0], startMinutes: t("10:00"), endMinutes: t("13:00"), location: "פארק הירקון", color: "#FFA726", isRecurring: false, date: "2026-04-05" },
-
-    // --- כל המשפחה ---
-    { familyId, title: "פיקניק משפחתי", assigneeType: "family", daysOfWeek: [5], startMinutes: t("11:00"), endMinutes: t("14:00"), location: "פארק הירקון", color: "#FFD700", isRecurring: false, date: "2026-03-20" },
-    { familyId, title: "ביקור אצל סבא וסבתא", assigneeType: "family", daysOfWeek: [1], startMinutes: t("18:00"), endMinutes: t("21:00"), location: "בית סבא", color: "#FFD700", isRecurring: false, date: "2026-03-23" },
-    { familyId, title: "ערב סרטים משפחתי", assigneeType: "family", daysOfWeek: [5], startMinutes: t("20:00"), endMinutes: t("22:00"), location: "בית", color: "#6C63FF", isRecurring: false, date: "2026-03-27" },
-    { familyId, title: "שוק איכרים", assigneeType: "family", daysOfWeek: [5], startMinutes: t("09:00"), endMinutes: t("11:00"), location: "שוק הכרמל", color: "#FFD700", isRecurring: false, date: "2026-04-03" },
-    { familyId, title: "ביקור בגן החיות", assigneeType: "family", daysOfWeek: [0], startMinutes: t("09:30"), endMinutes: t("14:00"), location: "גן חיות ירושלים", color: "#4ECDC4", isRecurring: false, date: "2026-04-05" },
-  ]);
-
-  console.log(`  📆  Family events inserted`);
-
-  // ── Summary ───────────────────────────────────────────────────────────────
-  console.log(`
-✅  Mock data inserted successfully for family ${familyId}
-   👩 👨  2 parents
-   👧 🧒 🦋  3 kids  (19 schedule blocks)
-   🛒  15 grocery items  (10 unbought, 5 bought)
-   ✅  12 chores  (5 selected for today)
-   📁  6 projects  (3 in_progress, 2 idea, 1 done)
-   📝  5 notes  (2 pinned)
-   📆  25 family events  (5 recurring, 20 one-time: 4×נועה, 4×עידו, 4×יעל, 5×משפחה + 3 existing)
-`);
+  console.log(`\n✅  Done! Mock data inserted for family ${cfg.familyId}\n`);
 }
 
 main().catch((err) => {

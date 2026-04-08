@@ -188,6 +188,28 @@ export const familyMembersApi = {
 // Family Events
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Telegram (calls the Assistant service, not the family-os backend)
+// ---------------------------------------------------------------------------
+
+const ASSISTANT_URL = process.env.EXPO_PUBLIC_ASSISTANT_URL ?? "http://localhost:8000";
+
+export const telegramApi = {
+  generateCode: async (familyId: string) => {
+    const res = await fetch(`${ASSISTANT_URL}/telegram/generate-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ family_id: familyId }),
+    });
+    if (!res.ok) throw new Error(`Assistant API ${res.status}`);
+    return res.json() as Promise<{ code: string; expires_in_minutes: number }>;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Family Events
+// ---------------------------------------------------------------------------
+
 export const familyEventsApi = {
   list: (fid: string) =>
     http.get<ApiFamilyEvent[]>(`${fam(fid)}/family-events`),

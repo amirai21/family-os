@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, Platform } from "react-native";
+import { View, StyleSheet, ScrollView, Platform, Pressable } from "react-native";
 import {
   Card,
   Text,
@@ -24,7 +24,7 @@ import { t, groceryCategoryLabel, shoppingCategoryLabel } from "@src/i18n";
 import type { GroceryItem, ShoppingCategory } from "@src/models/grocery";
 import { SHOPPING_CATEGORIES } from "@src/models/grocery";
 import { RTL_ROW } from "@src/ui/rtl";
-import { C, R, S } from "@src/ui/tokens";
+import { C, R, S, SHADOW } from "@src/ui/tokens";
 
 /** Emoji per subcategory — keyed by English key AND Hebrew label for compat with legacy data. */
 const SUBCATEGORY_EMOJI: Record<string, string> = {
@@ -208,15 +208,18 @@ export default function GroceryScreen() {
           </Card.Content>
         </Card>
 
-        <Button
-          mode="contained"
-          icon="plus"
-          style={styles.addButton}
-          contentStyle={styles.addButtonContent}
+        <Pressable
+          style={({ pressed }) => [
+            styles.addButton,
+            pressed && styles.addButtonPressed,
+          ]}
           onPress={() => setModalOpen(true)}
         >
-          {t("grocery.quickAdd")}
-        </Button>
+          <View style={styles.addButtonIcon}>
+            <IconButton icon="plus" iconColor="#FFF" size={20} style={{ margin: 0 }} />
+          </View>
+          <Text style={styles.addButtonLabel}>{t("grocery.quickAdd")}</Text>
+        </Pressable>
       </ScrollView>
 
       <GroceryAddModal
@@ -278,6 +281,31 @@ const styles = StyleSheet.create({
   boughtLabel: { fontSize: 13, fontWeight: "600", color: C.textSecondary, textAlign: "right" },
   boughtRow: { opacity: 0.5 },
   boughtText: { textDecorationLine: "line-through", color: C.textMuted, textAlign: "right" },
-  addButton: { borderRadius: R.md, backgroundColor: C.purple },
-  addButtonContent: { paddingVertical: S.sm },
+  addButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: S.sm,
+    borderRadius: R.xl,
+    backgroundColor: C.purple,
+    paddingVertical: S.md,
+    paddingHorizontal: S.xl,
+    ...SHADOW.md,
+    shadowColor: C.purple,
+  },
+  addButtonPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  addButtonIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addButtonLabel: {
+    color: "#FFF",
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
 });
