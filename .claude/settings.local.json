@@ -243,7 +243,10 @@
       "Bash(/opt/homebrew/bin/node -e \":*)",
       "Bash(node_modules/.bin/tsc --noEmit --pretty)",
       "Bash(/opt/homebrew/bin/node node_modules/.bin/tsc --noEmit --pretty)",
-      "Bash(find /Users/amirkoblyansky/family-os-assistant -type f \\\\\\(-name *.py -o -name *.sh \\\\\\) -path */scripts/* -o -name *seed* -o -name *mock* -o -name *fixture*)"
+      "Bash(find /Users/amirkoblyansky/family-os-assistant -type f \\\\\\(-name *.py -o -name *.sh \\\\\\) -path */scripts/* -o -name *seed* -o -name *mock* -o -name *fixture*)",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/lib/node_modules/npm/bin/**)",
+      "Read(//Users/amirkoblyansky/**)"
     ]
   }
 }
