@@ -66,9 +66,9 @@ export default function NoteModal({ visible, onDismiss, editNote }: Props) {
         onChangeText={setBody}
         mode="outlined"
         multiline
-        numberOfLines={4}
-        style={MS.input}
-        contentStyle={MS.inputContent}
+        numberOfLines={8}
+        style={[MS.input, { minHeight: 160 }]}
+        contentStyle={[MS.inputContent, { minHeight: 150 }]}
       />
 
       <View style={MS.actions}>
