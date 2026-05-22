@@ -26,7 +26,7 @@ npm run db:smoke     # smoke-test against live DB
 ```
 
 ### Deploy
-Push to `master` → GitHub Actions builds Docker image → deploys to Cloud Run at `https://family-os-644824480156.me-west1.run.app`.
+Push to `master` → GitHub Actions builds Docker image → deploys to Cloud Run at `https://family-os-4ilvxexrha-zf.a.run.app`.
 
 The Dockerfile builds the Expo web bundle (`expo export`) and copies it to `/public` inside the image, then serves it as static files from the same Hono server.
 
