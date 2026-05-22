@@ -1,12 +1,12 @@
 /**
  * WheelTimePicker — Scroll-wheel style time picker with hours & minutes columns.
  *
- * Uses FlatList + snapToInterval for a native-feeling wheel effect.
+ * Uses ScrollView + snapToInterval for a native-feeling wheel effect.
  * No external dependencies — pure React Native.
  */
 
 import React, { useRef, useCallback, useEffect } from "react";
-import { View, FlatList, Text, StyleSheet, Platform } from "react-native";
+import { View, ScrollView, Text, StyleSheet, Platform } from "react-native";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -56,8 +56,8 @@ export default function WheelTimePicker({
   const hourIndex = isNaN(h) ? 9 : h; // default 09
   const minuteIndex = isNaN(m) ? 0 : Math.round(m / minuteStep);
 
-  const hourRef = useRef<FlatList>(null);
-  const minuteRef = useRef<FlatList>(null);
+  const hourRef = useRef<ScrollView>(null);
+  const minuteRef = useRef<ScrollView>(null);
 
   // Track selected indices
   const selectedHour = useRef(hourIndex);
@@ -68,12 +68,12 @@ export default function WheelTimePicker({
     selectedHour.current = hourIndex;
     selectedMinute.current = minuteIndex;
     const timeout = setTimeout(() => {
-      hourRef.current?.scrollToOffset({
-        offset: hourIndex * ITEM_HEIGHT,
+      hourRef.current?.scrollTo({
+        y: hourIndex * ITEM_HEIGHT,
         animated: false,
       });
-      minuteRef.current?.scrollToOffset({
-        offset: minuteIndex * ITEM_HEIGHT,
+      minuteRef.current?.scrollTo({
+        y: minuteIndex * ITEM_HEIGHT,
         animated: false,
       });
     }, 50);
@@ -92,8 +92,8 @@ export default function WheelTimePicker({
 
   // On web, onMomentumScrollEnd never fires and onScrollEndDrag fires before
   // snapToInterval settles, so we debounce onScroll to capture the final position.
-  const hourDebounce = useRef<ReturnType<typeof setTimeout>>();
-  const minuteDebounce = useRef<ReturnType<typeof setTimeout>>();
+  const hourDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const minuteDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const onHourScroll = useCallback(
     (e: { nativeEvent: { contentOffset: { y: number } } }) => {
@@ -144,7 +144,7 @@ export default function WheelTimePicker({
       <WheelColumn
         ref={hourRef}
         data={HOURS}
-        initialIndex={hourIndex}
+        initialOffset={hourIndex * ITEM_HEIGHT}
         onScrollEnd={onHourScroll}
         onScroll={Platform.OS === "web" ? onHourScrollDebounced : undefined}
         formatItem={(v) => String(v).padStart(2, "0")}
@@ -157,7 +157,7 @@ export default function WheelTimePicker({
       <WheelColumn
         ref={minuteRef}
         data={minutes}
-        initialIndex={minuteIndex}
+        initialOffset={minuteIndex * ITEM_HEIGHT}
         onScrollEnd={onMinuteScroll}
         onScroll={Platform.OS === "web" ? onMinuteScrollDebounced : undefined}
         formatItem={(v) => String(v).padStart(2, "0")}
@@ -167,44 +167,22 @@ export default function WheelTimePicker({
 }
 
 // ---------------------------------------------------------------------------
-// WheelColumn — generic scrollable column
+// WheelColumn — generic scrollable column (ScrollView instead of FlatList)
 // ---------------------------------------------------------------------------
 
 interface WheelColumnProps {
   data: number[];
-  initialIndex: number;
+  initialOffset: number;
   onScrollEnd: (e: { nativeEvent: { contentOffset: { y: number } } }) => void;
   onScroll?: (e: { nativeEvent: { contentOffset: { y: number } } }) => void;
   formatItem: (value: number) => string;
 }
 
-const WheelColumn = React.forwardRef<FlatList, WheelColumnProps>(
-  ({ data, initialIndex, onScrollEnd, onScroll, formatItem }, ref) => {
-    const getItemLayout = useCallback(
-      (_: unknown, index: number) => ({
-        length: ITEM_HEIGHT,
-        offset: ITEM_HEIGHT * index,
-        index,
-      }),
-      [],
-    );
-
-    const renderItem = useCallback(
-      ({ item }: { item: number }) => (
-        <View style={styles.itemContainer}>
-          <Text style={styles.itemText}>{formatItem(item)}</Text>
-        </View>
-      ),
-      [formatItem],
-    );
-
+const WheelColumn = React.forwardRef<ScrollView, WheelColumnProps>(
+  ({ data, initialOffset, onScrollEnd, onScroll, formatItem }, ref) => {
     return (
-      <FlatList
+      <ScrollView
         ref={ref}
-        data={data}
-        keyExtractor={(item) => String(item)}
-        renderItem={renderItem}
-        getItemLayout={getItemLayout}
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate="fast"
@@ -218,11 +196,14 @@ const WheelColumn = React.forwardRef<FlatList, WheelColumnProps>(
           paddingTop: PAD_ITEMS * ITEM_HEIGHT,
           paddingBottom: PAD_ITEMS * ITEM_HEIGHT,
         }}
-        // Web doesn't support initialScrollIndex well, use scrollToOffset in useEffect
-        {...(Platform.OS !== "web" && {
-          initialScrollIndex: Math.max(0, initialIndex),
-        })}
-      />
+        contentOffset={{ x: 0, y: initialOffset }}
+      >
+        {data.map((item) => (
+          <View key={item} style={styles.itemContainer}>
+            <Text style={styles.itemText}>{formatItem(item)}</Text>
+          </View>
+        ))}
+      </ScrollView>
     );
   },
 );
