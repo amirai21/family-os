@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import { View, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { Text, TextInput, Button, HelperText } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuthStore } from "@src/auth/useAuthStore";
 import { t } from "@src/i18n";
 import { C, R, S } from "@src/ui/tokens";
-import { TEXT_RIGHT } from "@src/ui/rtl";
+import { RTL_ROW, TEXT_RIGHT } from "@src/ui/rtl";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
+
+type InviteMember = {
+  id: string;
+  displayName: string;
+  role: string | null;
+  avatarEmoji: string | null;
+  color: string | null;
+};
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -19,6 +27,8 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState(params.invite ?? "");
   const [familyName, setFamilyName] = useState("");
+  const [members, setMembers] = useState<InviteMember[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [validatingInvite, setValidatingInvite] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,6 +41,8 @@ export default function RegisterScreen() {
   const validateInvite = useCallback(async (code: string) => {
     if (code.length < 6) {
       setFamilyName("");
+      setMembers([]);
+      setSelectedMemberId(null);
       setInviteError("");
       return;
     }
@@ -43,12 +55,18 @@ export default function RegisterScreen() {
       if (res.ok) {
         const data = await res.json();
         setFamilyName(data.familyName);
+        setMembers(data.members ?? []);
+        setSelectedMemberId(null);
       } else {
         setFamilyName("");
+        setMembers([]);
+        setSelectedMemberId(null);
         setInviteError(t("auth.invalidFamilyCode"));
       }
     } catch {
       setFamilyName("");
+      setMembers([]);
+      setSelectedMemberId(null);
       setInviteError(t("auth.genericError"));
     } finally {
       setValidatingInvite(false);
@@ -60,6 +78,8 @@ export default function RegisterScreen() {
       validateInvite(inviteCode);
     } else {
       setFamilyName("");
+      setMembers([]);
+      setSelectedMemberId(null);
       setInviteError("");
     }
   }, [inviteCode, validateInvite]);
@@ -75,6 +95,7 @@ export default function RegisterScreen() {
         username,
         password,
         familyCode: inviteCode || undefined,
+        memberId: selectedMemberId ?? undefined,
       });
       // AuthGate handles redirect to /(tabs)/today once status is loggedIn
     } catch (err) {
@@ -135,6 +156,66 @@ export default function RegisterScreen() {
             <HelperText type="info" visible style={styles.helper}>
               {t("auth.inviteHint")}
             </HelperText>
+          )}
+
+          {/* Member picker — shown when invite is valid and has unlinked members */}
+          {joiningFamily && members.length > 0 && (
+            <View style={styles.memberPickerContainer}>
+              <Text style={styles.memberPickerTitle}>
+                {t("auth.whoAreYou")}
+              </Text>
+              <Text style={styles.memberPickerSubtitle}>
+                {t("auth.pickMember")}
+              </Text>
+              <View style={styles.memberPickerRow}>
+                {members.map((m) => {
+                  const selected = selectedMemberId === m.id;
+                  const memberColor = m.color ?? C.purple;
+                  return (
+                    <Pressable
+                      key={m.id}
+                      style={[
+                        styles.memberChip,
+                        {
+                          backgroundColor: selected
+                            ? memberColor + "20"
+                            : C.surface,
+                          borderColor: selected
+                            ? memberColor
+                            : C.border,
+                          borderWidth: selected ? 2 : 1,
+                        },
+                      ]}
+                      onPress={() =>
+                        setSelectedMemberId(selected ? null : m.id)
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.memberChipEmoji,
+                          { backgroundColor: memberColor + "18" },
+                        ]}
+                      >
+                        <Text style={styles.memberEmojiText}>
+                          {m.avatarEmoji ?? "👤"}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.memberChipName,
+                          selected && { color: memberColor, fontWeight: "800" },
+                        ]}
+                      >
+                        {m.displayName}
+                      </Text>
+                      {selected && (
+                        <Text style={{ fontSize: 14 }}>✓</Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
           )}
 
           <TextInput
@@ -218,7 +299,7 @@ const styles = StyleSheet.create({
     borderRadius: R.md,
     paddingVertical: S.sm,
     paddingHorizontal: S.md,
-    marginBottom: S.md,
+    marginBottom: S.sm,
     alignSelf: "center",
   },
   familyBadgeText: {
@@ -226,5 +307,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
+  },
+  // Member picker
+  memberPickerContainer: {
+    marginBottom: S.md,
+    gap: S.xs,
+  },
+  memberPickerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.textPrimary,
+    textAlign: TEXT_RIGHT,
+  },
+  memberPickerSubtitle: {
+    fontSize: 12,
+    color: C.textSecondary,
+    textAlign: TEXT_RIGHT,
+    marginBottom: S.sm,
+  },
+  memberPickerRow: {
+    flexDirection: RTL_ROW,
+    flexWrap: "wrap",
+    gap: S.sm,
+  },
+  memberChip: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    gap: S.sm,
+    paddingVertical: S.sm + 2,
+    paddingHorizontal: S.md,
+    borderRadius: R.lg,
+    minWidth: 100,
+  },
+  memberChipEmoji: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  memberEmojiText: { fontSize: 20 },
+  memberChipName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.textPrimary,
+    flex: 1,
   },
 });

@@ -315,6 +315,8 @@ const he = {
     joiningFamily: "מצטרפים למשפחת",
     joinFamily: "הצטרף למשפחה",
     inviteHint: "יש לכם קוד הזמנה? הזינו אותו כדי להצטרף למשפחה קיימת",
+    whoAreYou: "?מי את/ה",
+    pickMember: "בחרו את הפרופיל שלכם במשפחה",
     genericError: "שגיאה — נסו שנית",
     loading: "טוען…",
     logout: "התנתק",

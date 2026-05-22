@@ -40,11 +40,12 @@ async function authPost<T>(path: string, body: unknown): Promise<T> {
 
 class ApiAuthServiceImpl implements AuthService {
   async register(input: RegisterInput): Promise<AuthSession> {
-    const { username, password, familyCode } = input;
+    const { username, password, familyCode, memberId } = input;
 
     try {
       const body: Record<string, string> = { username, password };
       if (familyCode) body.inviteCode = familyCode;
+      if (memberId) body.memberId = memberId;
 
       const session = await authPost<AuthSession>("/v1/auth/register", body);
       await saveSession(session);

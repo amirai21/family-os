@@ -26,10 +26,11 @@ export const authRoutes = new Hono();
 // ---------------------------------------------------------------------------
 
 authRoutes.post("/register", async (c) => {
-  const { username, password, inviteCode } = await c.req.json<{
+  const { username, password, inviteCode, memberId } = await c.req.json<{
     username: string;
     password: string;
     inviteCode?: string;
+    memberId?: string;
   }>();
 
   // Validation
@@ -69,21 +70,31 @@ authRoutes.post("/register", async (c) => {
     // Mark invite as used
     await invitesRepo.markUsed(invite.id, user.id);
 
-    // Try to link user to an unlinked family member, or create a new one
-    const members = await db
-      .select()
-      .from(familyMembers)
-      .where(eq(familyMembers.familyId, familyId));
+    // Link user to the chosen family member, or create a new one
+    if (memberId) {
+      // Verify the member belongs to this family and is unlinked
+      const [member] = await db
+        .select()
+        .from(familyMembers)
+        .where(eq(familyMembers.id, memberId));
 
-    const unlinkedMember = members.find((m) => m.isActive && !m.userId);
-    if (unlinkedMember) {
-      // Link the first unlinked active member to this user
-      await db
-        .update(familyMembers)
-        .set({ userId: user.id })
-        .where(eq(familyMembers.id, unlinkedMember.id));
+      if (member && member.familyId === familyId && !member.userId) {
+        await db
+          .update(familyMembers)
+          .set({ userId: user.id })
+          .where(eq(familyMembers.id, memberId));
+      } else {
+        // Chosen member invalid — create a new one
+        await db.insert(familyMembers).values({
+          familyId,
+          userId: user.id,
+          displayName: trimmedUsername,
+          role: "parent",
+          isActive: true,
+        });
+      }
     } else {
-      // Create a new family member for this user
+      // No member chosen — create a new family member
       await db.insert(familyMembers).values({
         familyId,
         userId: user.id,

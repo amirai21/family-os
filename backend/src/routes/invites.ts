@@ -8,8 +8,8 @@
 import { Hono } from "hono";
 import { invitesRepo } from "../repos/invitesRepo.js";
 import { db } from "../db/client.js";
-import { families } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { families, familyMembers } from "../db/schema.js";
+import { eq, and, isNull } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // Family-scoped routes (mounted under /v1/family/:familyId/invites)
@@ -71,10 +71,29 @@ inviteValidateRoute.get("/invite/:code", async (c) => {
     .from(families)
     .where(eq(families.id, invite.familyId));
 
+  // Fetch unlinked active members so the joining user can pick who they are
+  const unlinkedMembers = await db
+    .select({
+      id: familyMembers.id,
+      displayName: familyMembers.displayName,
+      role: familyMembers.role,
+      avatarEmoji: familyMembers.avatarEmoji,
+      color: familyMembers.color,
+    })
+    .from(familyMembers)
+    .where(
+      and(
+        eq(familyMembers.familyId, invite.familyId),
+        eq(familyMembers.isActive, true),
+        isNull(familyMembers.userId),
+      ),
+    );
+
   return c.json({
     valid: true,
     familyId: invite.familyId,
     familyName: family?.name ?? "",
     expiresAt: invite.expiresAt.getTime(),
+    members: unlinkedMembers,
   });
 });

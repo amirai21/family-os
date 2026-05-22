@@ -24,6 +24,8 @@ export type RegisterInput = {
   password: string;
   /** Optional code to join an existing family. */
   familyCode?: string;
+  /** Optional family member ID to link this user to. */
+  memberId?: string;
 };
 
 export type LoginInput = {
