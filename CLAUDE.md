@@ -401,3 +401,17 @@ The drill, in order:
 - Root-cause Android RTL fix: `_layout.tsx` now triggers `Updates.reloadAsync()` after `forceRTL` in production builds so the in-memory `isRTL` flag flips on first install (was previously stuck false until manual app restart)
 - Defense-in-depth: added `writingDirection: "rtl"` to all shared `MS.*` text styles (heading, subtitle, label, inputContent, error, chipLabel, timeLabel)
 - Verified RTL fixes on Pixel 7 emulator via Expo Go: today/calendar screens render correctly; grocery add modal section labels (שם הפריט, כמות, קטגוריה) all right-aligned with icons on the right — calendar event modal uses same shared style so transitively verified
+
+#### QA pass (later same day, web only)
+- Ran a 12-phase QA sweep against local dev (backend `:3000` + web preview `:8083`). Web only — emulator booted but visual verification deferred to user.
+- Wrote `QA_REPORT.md` and `test.md` at repo root cataloguing **15 bugs** (1 critical / 2 high / 5 medium / 7 low) with reproduction steps, code refs, and an Android handoff checklist.
+- **Critical to remember for next agent:**
+  - **BUG #1** (CRITICAL): corrupting `family-os-store-v2` localStorage with unparseable JSON renders a permanent blank screen. Pulls succeed (200), no console errors, body innerText is `""`. Recovery requires manually clearing localStorage from DevTools — no in-app path. Root cause: Zustand `persist` middleware has no `onRehydrateStorage` error handler.
+  - **BUG #2** (HIGH): rapid clicks on any add-modal Save button create duplicate rows on the **server**, not just locally. Verified 5 clicks = 5 server rows via direct API GET after the test. Affects `GroceryAddModal`, `NoteModal`, `ChoreAddModal`, `FamilyEventModal`, `ProjectModal` — every modal needs an in-flight `loading` guard, not just `disabled={!title.trim()}`.
+  - **BUG #3** (HIGH): the onboarding wizard refuses to advance past the Kids step with zero kids ("יש להוסיף לפחות ילד/ה אחד/ת"). Childless / empty-nest / single-adult families currently can't onboard.
+- Also pushed a feature unrelated to the QA pass that was already in the working tree: collapsible Notes/Chores/Projects sections on Home tab (commit `ef5b811`). New `homeSections` store slice, migration to v11. Migration default `{ notes: true, chores: true, projects: true }` means all sections start expanded for existing users.
+- Both commits on master: `ef5b811` (collapsible sections) + `d0d1f64` (QA docs).
+- New memory reference: `reference_web_qa_automation.md` — RN-Web preview-tool gotchas (Pressable click sequence, input value-setter trick, ScrollView scrollTop, test-data cleanup snippets). Read before running any web QA.
+- **Things the preview tool genuinely cannot do** (don't waste time): two browser contexts (rules out multi-member sync + two-tab cross-update), visual verification on Android, network throttling for offline tests, iOS anything.
+- **Reproducible test-data hygiene:** stress-test items used the prefix `פריט-סטרס-${Date.now()}` and were DELETEd via direct API calls before ending the session. Dev backend talks to prod Neon — garbage persists otherwise. Snippet is in the new memory reference.
+- **Next priorities implied by the report**, in this order: fix Zustand rehydrate fallback (BUG #1), add `loading` state to all 5 modal Save buttons (BUG #2), make wizard Kids step optional (BUG #3), translate "admin" → Hebrew on Settings, run the Android handoff checklist visually.
