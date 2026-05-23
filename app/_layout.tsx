@@ -96,9 +96,12 @@ export default function RootLayout() {
     pullAll(authFamilyId)
       .then(() => {
         console.log("[sync] Pull succeeded");
-        // Auto-complete onboarding for existing users who already have data
+        // Auto-complete onboarding for joining users (second parent via invite)
+        // Only auto-complete if user didn't create this family (they have no claimed member yet)
         const s = useFamilyStore.getState();
-        if (!s.onboardingComplete && (s.familyMembers.length > 0 || s.kids.length > 0)) {
+        const userId = useAuthStore.getState().session?.user.id;
+        const hasClaimed = s.familyMembers.some((m) => m.userId === userId);
+        if (!s.onboardingComplete && hasClaimed) {
           s.setOnboardingComplete(true);
         }
       })

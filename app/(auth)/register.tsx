@@ -85,6 +85,9 @@ export default function RegisterScreen() {
     }
   }, [inviteCode, validateInvite]);
 
+  const joiningFamily = !!inviteFamilyName;
+  const familyNameError = !joiningFamily && newFamilyName.length > 0 && newFamilyName.length < 2;
+
   const handleRegister = async () => {
     setError("");
     if (username.length < 3 || password.length < 4) return;
@@ -100,7 +103,6 @@ export default function RegisterScreen() {
         familyCode: inviteCode || undefined,
         memberId: selectedMemberId ?? undefined,
       });
-      // AuthGate handles redirect to /(tabs)/today once status is loggedIn
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg === "USERNAME_TAKEN") setError(t("auth.usernameTaken"));
@@ -110,9 +112,6 @@ export default function RegisterScreen() {
       setLoading(false);
     }
   };
-
-  const joiningFamily = !!inviteFamilyName;
-  const familyNameError = !joiningFamily && newFamilyName.length > 0 && newFamilyName.length < 2;
 
   return (
     <SafeAreaView style={styles.safe}>

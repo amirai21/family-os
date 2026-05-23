@@ -8,19 +8,20 @@ import {
   KeyboardAvoidingView,
   Linking,
   Alert,
+  Share,
 } from "react-native";
 import { Text, TextInput, Button, SegmentedButtons } from "react-native-paper";
+import * as Clipboard from "expo-clipboard";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import { useAuthStore } from "@src/auth/useAuthStore";
 import {
   addFamilyMemberRemote,
   addKidRemote,
   updateFamilyNameRemote,
-  setFamilyMemberActiveRemote,
   setKidActiveRemote,
   claimFamilyMemberRemote,
 } from "@src/lib/sync/remoteCrud";
-import { telegramApi } from "@src/lib/api/endpoints";
+import { telegramApi, invitesApi } from "@src/lib/api/endpoints";
 import { getFamilyId } from "@src/lib/familyContext";
 import { MEMBER_ROLES } from "@src/models/familyMember";
 import type { MemberRole } from "@src/models/familyMember";
@@ -47,14 +48,13 @@ const KID_EMOJIS = [
   "🌻", "🍓", "👸", "🧚", "💃", "🤴", "🦸‍♂️", "🏎️",
 ];
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 export default function OnboardingWizard() {
   const familyName = useFamilyStore((s) => s.familyName);
   const setOnboardingComplete = useFamilyStore((s) => s.setOnboardingComplete);
 
   // Skip step 1 if family name was already set during registration
-  // (i.e., it's not the username default — user explicitly provided a surname)
   const hasRealFamilyName = familyName.length >= 2;
   const firstStep = hasRealFamilyName ? 2 : 1;
   const totalSteps = hasRealFamilyName ? TOTAL_STEPS - 1 : TOTAL_STEPS;
@@ -85,14 +85,24 @@ export default function OnboardingWizard() {
           >
             {step === 1 && <Step1FamilyName onNext={() => setStep(2)} />}
             {step === 2 && (
-              <Step2Members onNext={() => setStep(3)} onBack={() => setStep(firstStep === 2 ? 2 : 1)} />
+              <Step2AboutYou
+                onNext={() => setStep(3)}
+                onBack={() => setStep(firstStep === 2 ? 2 : 1)}
+              />
             )}
             {step === 3 && (
               <Step3Kids onNext={() => setStep(4)} onBack={() => setStep(2)} />
             )}
             {step === 4 && (
-              <Step4Telegram
+              <Step4Invite
+                onNext={() => setStep(5)}
                 onBack={() => setStep(3)}
+                onSkip={() => setStep(5)}
+              />
+            )}
+            {step === 5 && (
+              <Step5Telegram
+                onBack={() => setStep(4)}
                 onFinish={() => setOnboardingComplete(true)}
               />
             )}
@@ -118,7 +128,7 @@ function ProgressDots({ current, total }: { current: number; total: number }) {
   );
 }
 
-// ── Step 1: Family Name ──
+// ── Step 1: Family Name (unchanged) ──
 
 function Step1FamilyName({ onNext }: { onNext: () => void }) {
   const familyName = useFamilyStore((s) => s.familyName);
@@ -157,7 +167,7 @@ function Step1FamilyName({ onNext }: { onNext: () => void }) {
           mode="contained"
           onPress={handleNext}
           style={styles.navBtn}
-          buttonColor="#6C63FF"
+          buttonColor={C.purple}
         >
           {t("onboarding.next")}
         </Button>
@@ -166,9 +176,9 @@ function Step1FamilyName({ onNext }: { onNext: () => void }) {
   );
 }
 
-// ── Step 2: Family Members ──
+// ── Step 2: About You + optional Partner ──
 
-function Step2Members({
+function Step2AboutYou({
   onNext,
   onBack,
 }: {
@@ -177,54 +187,96 @@ function Step2Members({
 }) {
   const members = useFamilyStore((s) => s.familyMembers).filter((m) => m.isActive);
   const currentUserId = useAuthStore((s) => s.session?.user.id);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(
-    // Pre-select if already linked
-    members.find((m) => m.userId === currentUserId)?.id ?? null,
+
+  // Check if this user already has a claimed member
+  const alreadyClaimed = members.find((m) => m.userId === currentUserId);
+
+  // "About you" form state
+  const [name, setName] = useState(alreadyClaimed?.name ?? "");
+  const [role, setRole] = useState<MemberRole>(
+    (alreadyClaimed?.role as MemberRole) ?? "parent",
   );
-  const [claiming, setClaiming] = useState(false);
-  const [showForm, setShowForm] = useState(members.length === 0);
-  const [error, setError] = useState("");
-
-  // Inline form state
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<MemberRole>("parent");
-  const [avatarEmoji, setAvatarEmoji] = useState("👤");
-  const [color, setColor] = useState(COLOR_SWATCHES[0]);
+  const [avatarEmoji, setAvatarEmoji] = useState(
+    alreadyClaimed?.avatarEmoji ?? "👨",
+  );
+  const [color, setColor] = useState(
+    alreadyClaimed?.color ?? COLOR_SWATCHES[0],
+  );
   const [nameError, setNameError] = useState("");
+  const [selfSaved, setSelfSaved] = useState(!!alreadyClaimed);
 
-  const resetForm = () => {
-    setName("");
-    setRole("parent");
-    setAvatarEmoji("👤");
-    setColor(COLOR_SWATCHES[0]);
-    setNameError("");
-  };
+  // Partner sub-step state
+  const [showPartnerForm, setShowPartnerForm] = useState(false);
+  const [partnerName, setPartnerName] = useState("");
+  const [partnerRole, setPartnerRole] = useState<MemberRole>("parent");
+  const [partnerEmoji, setPartnerEmoji] = useState("👩");
+  const [partnerColor, setPartnerColor] = useState(COLOR_SWATCHES[1]);
+  const [partnerNameError, setPartnerNameError] = useState("");
+  const [partnerSaved, setPartnerSaved] = useState(false);
 
-  const handleAdd = () => {
+  const [claiming, setClaiming] = useState(false);
+
+  // Count non-self members (potential partners already added)
+  const partnerMembers = members.filter(
+    (m) => m.userId !== currentUserId && !m.userId,
+  );
+  const hasPartnerAlready = partnerMembers.length > 0 || partnerSaved;
+
+  const handleSaveSelf = async () => {
     const trimmed = name.trim();
     if (!trimmed) { setNameError(t("settings.nameRequired")); return; }
     if (trimmed.length < 2) { setNameError(t("settings.nameMinLength")); return; }
-    addFamilyMemberRemote({ name: trimmed, role, avatarEmoji, color });
-    resetForm();
-    setShowForm(false);
-    setError("");
+
+    // Create the member and claim it
+    setClaiming(true);
+    try {
+      const newMember = addFamilyMemberRemote({
+        name: trimmed,
+        role,
+        avatarEmoji,
+        color,
+      });
+      // Small delay for the store to update, then claim
+      setTimeout(async () => {
+        try {
+          const latestMembers = useFamilyStore.getState().familyMembers;
+          const created = latestMembers.find(
+            (m) => m.name === trimmed && m.isActive && !m.userId,
+          );
+          if (created) {
+            await claimFamilyMemberRemote(created.id);
+          }
+        } catch {
+          // Non-fatal — user can fix later
+        } finally {
+          setClaiming(false);
+          setSelfSaved(true);
+        }
+      }, 300);
+    } catch {
+      setClaiming(false);
+    }
   };
 
-  const handleNext = async () => {
-    if (members.length === 0) {
-      setError(t("onboarding.atLeastOneMember"));
+  const handleSavePartner = () => {
+    const trimmed = partnerName.trim();
+    if (!trimmed) { setPartnerNameError(t("settings.nameRequired")); return; }
+    if (trimmed.length < 2) { setPartnerNameError(t("settings.nameMinLength")); return; }
+    addFamilyMemberRemote({
+      name: trimmed,
+      role: partnerRole,
+      avatarEmoji: partnerEmoji,
+      color: partnerColor,
+    });
+    setPartnerSaved(true);
+    setShowPartnerForm(false);
+  };
+
+  const handleNext = () => {
+    if (!selfSaved) {
+      // Auto-save if not saved yet
+      handleSaveSelf();
       return;
-    }
-    // Claim the selected member before proceeding
-    if (selectedMemberId) {
-      setClaiming(true);
-      try {
-        await claimFamilyMemberRemote(selectedMemberId);
-      } catch {
-        // Non-fatal — user can fix later in settings
-      } finally {
-        setClaiming(false);
-      }
     }
     onNext();
   };
@@ -240,27 +292,20 @@ function Step2Members({
       <Text style={styles.stepTitle}>{t("onboarding.step2Title")}</Text>
       <Text style={styles.stepSubtitle}>{t("onboarding.step2Subtitle")}</Text>
 
-      {/* Already added members */}
-      {members.map((m) => (
-        <View key={m.id} style={styles.addedRow}>
-          <View style={[styles.addedEmoji, { backgroundColor: (m.color ?? C.purple) + "22" }]}>
-            <Text style={{ fontSize: 20 }}>{m.avatarEmoji ?? "👤"}</Text>
+      {/* ── "About you" section ── */}
+      {selfSaved ? (
+        <View style={styles.addedRow}>
+          <View style={[styles.addedEmoji, { backgroundColor: color + "22" }]}>
+            <Text style={{ fontSize: 20 }}>{avatarEmoji}</Text>
           </View>
-          <Text style={styles.addedName}>{m.name}</Text>
-          <Text style={styles.addedRole}>{memberRoleLabel(m.role)}</Text>
-          <Pressable
-            onPress={() => setFamilyMemberActiveRemote(m.id, false)}
-            style={styles.removeBtn}
-          >
-            <Text style={styles.removeBtnText}>✕</Text>
-          </Pressable>
+          <Text style={styles.addedName}>{name}</Text>
+          <Text style={styles.addedRole}>{memberRoleLabel(role)}</Text>
+          <Text style={{ fontSize: 14, color: C.teal }}>✓</Text>
         </View>
-      ))}
-
-      {showForm ? (
+      ) : (
         <View style={styles.inlineForm}>
           <TextInput
-            placeholder={t("settings.memberName")}
+            placeholder={t("onboarding.yourName")}
             value={name}
             onChangeText={(v) => { setName(v); if (nameError) setNameError(""); }}
             mode="outlined"
@@ -304,75 +349,130 @@ function Step2Members({
             ))}
           </View>
 
+          <Button
+            mode="contained"
+            onPress={handleSaveSelf}
+            loading={claiming}
+            buttonColor={C.purple}
+            style={{ borderRadius: R.md, marginTop: S.sm }}
+          >
+            {t("onboarding.next")}
+          </Button>
+        </View>
+      )}
+
+      {/* ── Partner sub-step (shown after self is saved) ── */}
+      {selfSaved && !hasPartnerAlready && !showPartnerForm && (
+        <View style={styles.partnerPrompt}>
+          <Text style={styles.partnerPromptTitle}>
+            {t("onboarding.step2AddPartner")}
+          </Text>
+          <Text style={styles.partnerPromptSubtitle}>
+            {t("onboarding.step2AddPartnerSubtitle")}
+          </Text>
+          <Button
+            mode="outlined"
+            onPress={() => setShowPartnerForm(true)}
+            icon="plus"
+            style={styles.addBtn}
+          >
+            {t("onboarding.addPartner")}
+          </Button>
+        </View>
+      )}
+
+      {selfSaved && showPartnerForm && (
+        <View style={[styles.inlineForm, { marginTop: S.md }]}>
+          <TextInput
+            placeholder={t("onboarding.partnerName")}
+            value={partnerName}
+            onChangeText={(v) => { setPartnerName(v); if (partnerNameError) setPartnerNameError(""); }}
+            mode="outlined"
+            style={MS.input}
+            contentStyle={MS.inputContent}
+            autoFocus
+            error={!!partnerNameError}
+          />
+          {partnerNameError ? <Text style={MS.error}>{partnerNameError}</Text> : null}
+
+          <Text style={MS.label}>{t("settings.memberRole")}</Text>
+          <SegmentedButtons
+            value={partnerRole}
+            onValueChange={(v) => setPartnerRole(v as MemberRole)}
+            buttons={roleButtons}
+            style={MS.segmented}
+            theme={SEGMENT_THEME}
+          />
+
+          <Text style={MS.label}>{t("settings.memberEmoji")}</Text>
+          <View style={styles.pickerRow}>
+            {MEMBER_EMOJIS.map((e) => (
+              <Pressable
+                key={e}
+                onPress={() => setPartnerEmoji(e)}
+                style={[styles.emojiCell, partnerEmoji === e && styles.emojiSelected]}
+              >
+                <Text style={styles.emojiText}>{e}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={MS.label}>{t("settings.memberColor")}</Text>
+          <View style={styles.pickerRow}>
+            {COLOR_SWATCHES.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setPartnerColor(c)}
+                style={[styles.colorCell, { backgroundColor: c }, partnerColor === c && styles.colorSelected]}
+              />
+            ))}
+          </View>
+
           <View style={[styles.navRow, { gap: S.sm }]}>
-            <Button onPress={() => { resetForm(); setShowForm(false); }}>
+            <Button onPress={() => setShowPartnerForm(false)}>
               {t("cancel")}
             </Button>
-            <Button mode="contained" onPress={handleAdd} buttonColor="#6C63FF">
+            <Button mode="contained" onPress={handleSavePartner} buttonColor={C.purple}>
               {t("add")}
             </Button>
           </View>
         </View>
-      ) : (
-        <Button
-          mode="outlined"
-          onPress={() => setShowForm(true)}
-          icon="plus"
-          style={styles.addBtn}
-        >
-          {t("onboarding.addMember")}
-        </Button>
       )}
 
-      {error ? <Text style={[MS.error, { marginTop: S.sm }]}>{error}</Text> : null}
-
-      {/* "Who are you?" picker — shown once members exist */}
-      {members.length > 0 && (
-        <View style={styles.claimSection}>
-          <Text style={styles.claimTitle}>{t("auth.whoAreYou")}</Text>
-          <Text style={styles.claimSubtitle}>{t("auth.pickMember")}</Text>
-          <View style={styles.claimRow}>
-            {members.map((m) => {
-              const selected = selectedMemberId === m.id;
-              const memberColor = m.color ?? C.purple;
-              return (
-                <Pressable
-                  key={m.id}
-                  style={[
-                    styles.claimChip,
-                    {
-                      backgroundColor: selected ? memberColor + "20" : C.surface,
-                      borderColor: selected ? memberColor : C.border,
-                      borderWidth: selected ? 2 : 1,
-                    },
-                  ]}
-                  onPress={() => setSelectedMemberId(selected ? null : m.id)}
-                >
-                  <View style={[styles.claimEmoji, { backgroundColor: memberColor + "18" }]}>
-                    <Text style={{ fontSize: 20 }}>{m.avatarEmoji ?? "👤"}</Text>
-                  </View>
-                  <Text style={[styles.claimName, selected && { color: memberColor, fontWeight: "800" }]}>
-                    {m.name}
-                  </Text>
-                  {selected && <Text style={{ fontSize: 14 }}>✓</Text>}
-                </Pressable>
-              );
-            })}
-          </View>
+      {/* Partner saved confirmation */}
+      {selfSaved && partnerSaved && (
+        <View style={styles.partnerDoneBadge}>
+          <Text style={styles.partnerDoneText}>
+            {t("onboarding.step2PartnerAdded")} ✨
+          </Text>
         </View>
       )}
 
-      <View style={styles.navRow}>
-        <Button onPress={onBack}>{t("onboarding.back")}</Button>
-        <Button mode="contained" onPress={handleNext} loading={claiming} buttonColor="#6C63FF">
-          {t("onboarding.next")}
-        </Button>
-      </View>
+      {/* Show already-added partner from store */}
+      {selfSaved && partnerMembers.map((m) => (
+        <View key={m.id} style={[styles.addedRow, { marginTop: S.sm }]}>
+          <View style={[styles.addedEmoji, { backgroundColor: (m.color ?? C.purple) + "22" }]}>
+            <Text style={{ fontSize: 20 }}>{m.avatarEmoji ?? "👤"}</Text>
+          </View>
+          <Text style={styles.addedName}>{m.name}</Text>
+          <Text style={styles.addedRole}>{memberRoleLabel(m.role)}</Text>
+        </View>
+      ))}
+
+      {/* Navigation */}
+      {selfSaved && (
+        <View style={styles.navRow}>
+          <Button onPress={onBack}>{t("onboarding.back")}</Button>
+          <Button mode="contained" onPress={handleNext} buttonColor={C.purple}>
+            {t("onboarding.next")}
+          </Button>
+        </View>
+      )}
     </View>
   );
 }
 
-// ── Step 3: Kids ──
+// ── Step 3: Kids (unchanged) ──
 
 function Step3Kids({
   onNext,
@@ -478,7 +578,7 @@ function Step3Kids({
             <Button onPress={() => { resetForm(); setShowForm(false); }}>
               {t("cancel")}
             </Button>
-            <Button mode="contained" onPress={handleAdd} buttonColor="#6C63FF">
+            <Button mode="contained" onPress={handleAdd} buttonColor={C.purple}>
               {t("add")}
             </Button>
           </View>
@@ -498,7 +598,7 @@ function Step3Kids({
 
       <View style={styles.navRow}>
         <Button onPress={onBack}>{t("onboarding.back")}</Button>
-        <Button mode="contained" onPress={handleNext} buttonColor="#6C63FF">
+        <Button mode="contained" onPress={handleNext} buttonColor={C.purple}>
           {t("onboarding.next")}
         </Button>
       </View>
@@ -506,9 +606,119 @@ function Step3Kids({
   );
 }
 
-// ── Step 4: Telegram ──
+// ── Step 4: Invite Partner (NEW) ──
 
-function Step4Telegram({
+function Step4Invite({
+  onNext,
+  onBack,
+  onSkip,
+}: {
+  onNext: () => void;
+  onBack: () => void;
+  onSkip: () => void;
+}) {
+  const familyName = useFamilyStore((s) => s.familyName);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const generateInvite = async () => {
+    setGenerating(true);
+    try {
+      const familyId = await getFamilyId();
+      const result = await invitesApi.create(familyId);
+      setInviteCode(result.code);
+    } catch {
+      Alert.alert("שגיאה ביצירת קוד הזמנה");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyCode = async () => {
+    if (!inviteCode) return;
+    await Clipboard.setStringAsync(inviteCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareInvite = async () => {
+    if (!inviteCode) return;
+    const appUrl =
+      process.env.EXPO_PUBLIC_APP_URL ||
+      (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "");
+    const link = `${appUrl}/register?invite=${inviteCode}`;
+    const message = `הצטרפו למשפחת ${familyName} באפליקציית Family OS!\n\n${link}\n\nקוד ההזמנה: ${inviteCode}`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // User cancelled share
+    }
+  };
+
+  return (
+    <View>
+      <Text style={styles.stepTitle}>{t("onboarding.step4Title")} 💌</Text>
+      <Text style={styles.stepSubtitle}>{t("onboarding.step4Subtitle")}</Text>
+
+      {!inviteCode ? (
+        <Button
+          mode="contained"
+          onPress={generateInvite}
+          loading={generating}
+          disabled={generating}
+          icon="account-plus"
+          style={{ borderRadius: R.md, marginTop: S.md }}
+          buttonColor={C.purple}
+        >
+          {t("settings.generateInvite")}
+        </Button>
+      ) : (
+        <View style={styles.inviteContainer}>
+          <View style={styles.inviteCodeBox}>
+            <Text style={styles.inviteCodeText}>{inviteCode}</Text>
+          </View>
+          <View style={styles.inviteActions}>
+            <Button
+              mode="outlined"
+              onPress={copyCode}
+              icon={copied ? "check" : "content-copy"}
+              style={styles.inviteActionBtn}
+            >
+              {copied ? t("settings.codeCopied") : t("settings.copyCode")}
+            </Button>
+            <Button
+              mode="contained"
+              onPress={shareInvite}
+              icon="share-variant"
+              style={styles.inviteActionBtn}
+              buttonColor={C.purple}
+            >
+              {t("settings.shareInvite")}
+            </Button>
+          </View>
+          <Text style={styles.inviteExpiry}>
+            {t("settings.inviteExpires", { days: "7" })}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.navRow}>
+        <Button onPress={onBack}>{t("onboarding.back")}</Button>
+        <View style={{ flexDirection: "row", gap: S.sm }}>
+          <Button onPress={onSkip}>{t("onboarding.step4Skip")}</Button>
+          <Button mode="contained" onPress={onNext} buttonColor={C.purple}>
+            {t("onboarding.next")}
+          </Button>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ── Step 5: Telegram ──
+
+function Step5Telegram({
   onBack,
   onFinish,
 }: {
@@ -534,9 +744,9 @@ function Step4Telegram({
   return (
     <View>
       <Text style={styles.stepTitle}>
-        {t("onboarding.step4Title")} 🤖
+        {t("onboarding.step5Title")} 🤖
       </Text>
-      <Text style={styles.stepSubtitle}>{t("onboarding.step4Subtitle")}</Text>
+      <Text style={styles.stepSubtitle}>{t("onboarding.step5Subtitle")}</Text>
 
       <Button
         mode="contained"
@@ -552,7 +762,7 @@ function Step4Telegram({
 
       <View style={styles.navRow}>
         <Button onPress={onBack}>{t("onboarding.back")}</Button>
-        <Button mode="contained" onPress={onFinish} buttonColor="#6C63FF">
+        <Button mode="contained" onPress={onFinish} buttonColor={C.purple}>
           {t("onboarding.finish")}
         </Button>
       </View>
@@ -609,7 +819,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.border,
   },
   dotActive: {
-    backgroundColor: "#6C63FF",
+    backgroundColor: C.purple,
     width: 24,
   },
   stepTitle: {
@@ -720,51 +930,68 @@ const styles = StyleSheet.create({
     borderRadius: R.md,
     marginTop: S.md,
   },
-  // "Who are you?" claim section
-  claimSection: {
+  // Partner prompt
+  partnerPrompt: {
     marginTop: S.xl,
     paddingTop: S.lg,
     borderTopWidth: 1,
     borderTopColor: C.border,
     gap: S.xs,
   },
-  claimTitle: {
+  partnerPromptTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: C.textPrimary,
     textAlign: TEXT_RIGHT,
   },
-  claimSubtitle: {
+  partnerPromptSubtitle: {
     fontSize: 12,
     color: C.textSecondary,
     textAlign: TEXT_RIGHT,
     marginBottom: S.sm,
   },
-  claimRow: {
-    flexDirection: RTL_ROW,
-    flexWrap: "wrap",
-    gap: S.sm,
-  },
-  claimChip: {
-    flexDirection: RTL_ROW,
-    alignItems: "center",
-    gap: S.sm,
-    paddingVertical: S.sm + 2,
+  partnerDoneBadge: {
+    backgroundColor: C.teal + "14",
+    borderRadius: R.md,
+    paddingVertical: S.sm,
     paddingHorizontal: S.md,
-    borderRadius: R.lg,
-    minWidth: 100,
+    marginTop: S.md,
+    alignSelf: "center",
   },
-  claimEmoji: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-  },
-  claimName: {
-    fontSize: 15,
+  partnerDoneText: {
+    color: C.teal,
+    fontSize: 13,
     fontWeight: "600",
-    color: C.textPrimary,
+    textAlign: "center",
+  },
+  // Invite step
+  inviteContainer: {
+    marginTop: S.md,
+    gap: S.md,
+  },
+  inviteCodeBox: {
+    backgroundColor: C.surfaceSubtle,
+    borderRadius: R.md,
+    padding: S.lg,
+    alignItems: "center",
+  },
+  inviteCodeText: {
+    fontSize: 32,
+    fontWeight: "800",
+    letterSpacing: 6,
+    color: C.purple,
+  },
+  inviteActions: {
+    flexDirection: RTL_ROW,
+    gap: S.sm,
+  },
+  inviteActionBtn: {
     flex: 1,
+    borderRadius: R.md,
+  },
+  inviteExpiry: {
+    fontSize: 12,
+    color: C.textSecondary,
+    textAlign: "center",
   },
 });

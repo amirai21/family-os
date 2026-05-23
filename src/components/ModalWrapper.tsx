@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     justifyContent: "flex-start",
-    paddingTop: 24,
+    paddingTop: 48,
     flex: 1,
     pointerEvents: "box-none",
   },

@@ -170,7 +170,11 @@ export default function SettingsScreen() {
 
   const shareInvite = async () => {
     if (!inviteCode) return;
-    const message = `הצטרפו למשפחת ${familyName} באפליקציית Family OS!\nקוד ההזמנה: ${inviteCode}`;
+    const appUrl =
+      process.env.EXPO_PUBLIC_APP_URL ||
+      (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "");
+    const link = `${appUrl}/register?invite=${inviteCode}`;
+    const message = `הצטרפו למשפחת ${familyName} באפליקציית Family OS!\n\n${link}\n\nקוד ההזמנה: ${inviteCode}`;
     try {
       await Share.share({ message });
     } catch {
