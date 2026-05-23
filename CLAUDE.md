@@ -63,6 +63,16 @@ kill $(pgrep -f qemu-system)         # force-kill emulator process
 - Web dev server uses port 8083 (separate, no conflict)
 - Use `-no-snapshot-load` to avoid stale snapshot issues
 
+### Android Build (EAS)
+Production builds run on Expo's cloud (~15-20 min). Profiles defined in `eas.json`:
+```bash
+eas login                                           # first time only
+eas build --profile preview --platform android      # internal APK (sideload to your phone)
+eas build --profile production --platform android   # AAB for Google Play Store
+```
+
+**Gotcha — native builds need explicit URLs.** `.env.production` has `EXPO_PUBLIC_API_URL=""` (relies on same-origin, which only works on web). For native builds, `eas.json` overrides this with the explicit Cloud Run URL via the `env` block per profile. When adding new `EXPO_PUBLIC_*` vars, update both `.env.production` (web) AND the `env` blocks in `eas.json` (native).
+
 ### Backend (`cd backend`)
 ```bash
 npm run dev          # tsx watch src/server.ts  (port 3000)

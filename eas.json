@@ -8,11 +8,19 @@
       "android": {
         "buildType": "apk",
         "distribution": "internal"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://family-os-4ilvxexrha-zf.a.run.app",
+        "EXPO_PUBLIC_APP_URL": "https://family-os-4ilvxexrha-zf.a.run.app"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://family-os-4ilvxexrha-zf.a.run.app",
+        "EXPO_PUBLIC_APP_URL": "https://family-os-4ilvxexrha-zf.a.run.app"
       }
     }
   }
