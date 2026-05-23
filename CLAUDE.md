@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Family OS — a Hebrew RTL family management app (React Native / Expo) targeting iOS and web. The backend is a Hono API deployed to Google Cloud Run. The web app is bundled into the Docker image and served by the same backend process.
+Family OS — a Hebrew RTL family management app (React Native / Expo) targeting iOS, Android, and web. Two parents share a single family: grocery lists, chores, kids' schedules, notes, projects, calendar events. The backend is a Hono API deployed to Google Cloud Run. The web app is bundled into the Docker image and served by the same backend process.
+
+**Language:** Hebrew-only, full RTL. No English UI strings.
 
 ## Commands
 
@@ -12,9 +14,54 @@ Family OS — a Hebrew RTL family management app (React Native / Expo) targeting
 ```bash
 npx expo start --web --port 8083   # dev server (web)
 npx expo start --ios               # iOS simulator
+npx expo start --android           # Android emulator
 npx expo lint                      # ESLint
 node_modules/.bin/tsc --noEmit     # type-check (no npx wrapper needed)
 ```
+
+### Android Emulator
+The Android SDK is at `~/Library/Android/sdk`. `ANDROID_HOME` is **not** exported in `.zshrc`/`.zprofile`, so all SDK tools need full paths.
+
+**Quick-start (two terminals):**
+```bash
+# Terminal 1 — boot emulator (takes ~30s, keep running)
+export ANDROID_HOME=~/Library/Android/sdk
+~/Library/Android/sdk/emulator/emulator -avd Pixel_7 -no-snapshot-load &
+
+# Terminal 2 — once emulator shows lock screen, start Expo
+export ANDROID_HOME=~/Library/Android/sdk
+npx expo start --android
+```
+
+**Verify emulator is connected:**
+```bash
+~/Library/Android/sdk/platform-tools/adb devices
+# Should show:  emulator-5554   device
+```
+
+**Port conflict troubleshooting:**
+Metro bundler defaults to port 8081. If it crashes or the emulator can't connect:
+```bash
+# Kill stale Metro processes
+lsof -i :8081 | grep LISTEN          # find PID
+kill <PID>
+
+# Kill stale emulator (if it won't respond)
+~/Library/Android/sdk/platform-tools/adb kill-server
+kill $(pgrep -f qemu-system)         # force-kill emulator process
+
+# Restart ADB
+~/Library/Android/sdk/platform-tools/adb start-server
+
+# Then relaunch emulator + expo
+```
+
+**Key details:**
+- AVD: `Pixel_7` (Android 15, arm64). List AVDs: `~/Library/Android/sdk/emulator/emulator -list-avds`
+- Emulator uses ports 5554/5555 (ADB console/connection)
+- Metro bundler uses port 8081 (Expo default for native)
+- Web dev server uses port 8083 (separate, no conflict)
+- Use `-no-snapshot-load` to avoid stale snapshot issues
 
 ### Backend (`cd backend`)
 ```bash
@@ -25,6 +72,31 @@ npm run db:seed      # seed initial data
 npm run db:smoke     # smoke-test against live DB
 ```
 
+### Environment Configuration
+Frontend env vars use the `EXPO_PUBLIC_*` prefix (baked into the bundle at build time). Expo auto-loads `.env.<NODE_ENV>` from the working directory:
+- `expo start` → `NODE_ENV=development` → loads `.env.development`
+- `expo export` (inside Dockerfile) → `NODE_ENV=production` → loads `.env.production`
+
+| Var | `.env.development` | `.env.production` | Purpose |
+|---|---|---|---|
+| `EXPO_PUBLIC_API_URL` | `http://localhost:3000` | `""` (empty → relative) | Backend API base URL |
+| `EXPO_PUBLIC_APP_URL` | prod Cloud Run URL | `""` (empty → `window.location.origin`) | Base URL for shareable deep links (invite URLs) |
+
+**Same-origin pattern (prod):** Both vars are empty in `.env.production`. API calls become relative (`/v1/...`) and resolve to the Cloud Run service serving the bundle. Share links fall back to `window.location.origin` in JS. This means the same Docker image works on any Cloud Run service (prod, staging, future) — no rebuild needed per env.
+
+**Adding staging:** Just deploy the same image to another Cloud Run service. No env config to change. (If you ever need *different* build-time values per env — e.g., a separate analytics key — introduce `.env.staging` and use a Docker build arg + `app.config.ts` to pick which one gets copied in.)
+
+**Files:**
+- `.env.example` — committed reference (documents the vars)
+- `.env.development` — gitignored, local dev defaults (you create from `.env.example`)
+- `.env.production` — **committed**, used by `expo export` inside the Docker build
+  - Safe to commit because `EXPO_PUBLIC_*` vars are baked into the JS bundle and inspectable in DevTools — same pattern as Next.js `NEXT_PUBLIC_*`
+  - Backend secrets (DB URL, JWT secret) live in Cloud Run env vars, not here
+- `.dockerignore` only excludes bare `.env` (not `.env.*`), so `.env.production` is copied into the build context
+
+### Test Login
+Web dev credentials: username `כהן`, password `123456`.
+
 ### Deploy
 Push to `master` → GitHub Actions builds Docker image → deploys to Cloud Run at `https://family-os-4ilvxexrha-zf.a.run.app`.
 
@@ -33,10 +105,27 @@ The Dockerfile builds the Expo web bundle (`expo export`) and copies it to `/pub
 ## Architecture
 
 ### Monorepo Structure
-- `/` — Expo React Native app (iOS + web)
+- `/` — Expo React Native app (iOS + Android + web)
 - `/backend` — Hono REST API + Drizzle ORM (Node.js ESM)
 - `/src` — all frontend source (store, components, lib, models, i18n)
 - `/app` — Expo Router file-based routes
+
+### Key Frontend Files
+| File | Purpose |
+|------|---------|
+| `src/store/useFamilyStore.ts` | Single Zustand store — all family data |
+| `src/lib/sync/remoteCrud.ts` | Optimistic mutation helpers (`*Remote` functions) |
+| `src/lib/sync/syncEngine.ts` | `pullAll()` / `pushAll()` — server sync |
+| `src/lib/api/endpoints.ts` | API client per resource |
+| `src/lib/api/mappers.ts` | API ↔ local model converters |
+| `src/lib/api/types.ts` | API request/response types |
+| `src/auth/useAuthStore.ts` | Auth state (Zustand, non-persisted) |
+| `src/auth/ApiAuthService.ts` | JWT token management via SecureStore |
+| `src/ui/tokens.ts` | Design tokens — colors (`C`), spacing (`S`), radii (`R`), shadows (`SHADOW`) |
+| `src/ui/rtl.ts` | RTL helpers — `RTL_ROW`, `TEXT_RIGHT`, `TEXT_LEFT` |
+| `src/i18n/he.ts` | All Hebrew strings |
+| `src/components/ModalWrapper.tsx` | Shared modal overlay (used by all *Modal components) |
+| `src/components/CustomTabBar.tsx` | Bottom tab bar with per-tab accent colors |
 
 ### Frontend Data Flow
 **Optimistic mutations (the standard pattern):**
@@ -58,14 +147,24 @@ Expo Router file-based routing:
 
 The `(tabs)` group uses a `CustomTabBar` with per-tab accent colors.
 
+### Auth & Multi-User
+- JWT-based auth stored in SecureStore (native) / AsyncStorage (web).
+- `useAuthStore` manages session lifecycle: `bootstrap → login/register → logout`.
+- On bootstrap, token is validated against `GET /v1/auth/me`; on 401/403 → auto-logout. Network errors are tolerated (offline mode).
+- **Invite flow:** First user creates family → generates 6-char invite code in Settings (valid 7 days, single-use) → second user enters code on Register screen → selects which family member they are (e.g., "אמא") → backend links their new user account to that member.
+- Invite validation endpoint is public: `GET /v1/auth/invite/:code`.
+- `POST /v1/auth/register` handles both new-family and join-family flows.
+
 ### RTL (Hebrew)
 All RTL is activated once at app start in `app/_layout.tsx` via `I18nManager.forceRTL(true)`. Always import from `src/ui/rtl.ts`:
 
 ```ts
-import { RTL_ROW, RTL_ALIGN_RIGHT, rtl } from "@src/ui/rtl";
+import { RTL_ROW, RTL_ALIGN_RIGHT, rtl, TEXT_RIGHT, TEXT_LEFT } from "@src/ui/rtl";
 ```
 
 - **`RTL_ROW`** — use instead of `flexDirection: "row-reverse"`. It's `"row"` when RTL is active (RN Web auto-mirrors it) and `"row-reverse"` when not. **Never** use `I18nManager.isRTL ? "row-reverse" : "row"` — this causes a double-flip on web.
+- **`TEXT_RIGHT`** — `"right"` on web, `undefined` on native (RTL engine handles it).
+- **`TEXT_LEFT`** — for LTR content like numbers. `"left"` on web, `"right"` on native RTL (to counteract mirroring).
 - **`direction: "ltr"`** in StyleSheet is completely ignored by RN Web (use only for web via inline style `({ direction: "ltr" } as any)` if truly needed).
 - On web, `left`/`right` CSS properties are **not** auto-mirrored by RN Web — but `flexDirection` is. `position: absolute` with `left: X` stays as physical left.
 - On iOS, `left: X` **is** auto-mirrored to `right: X` by I18nManager.
@@ -73,7 +172,26 @@ import { RTL_ROW, RTL_ALIGN_RIGHT, rtl } from "@src/ui/rtl";
 ### Backend (`backend/`)
 Hono REST API with Drizzle ORM on Neon Postgres. Routes follow pattern `/v1/family/:familyId/<resource>`. All routes under `/v1/family/*` are protected by JWT middleware (`jwtAuth` + `familyGuard` ensures the JWT's familyId matches the URL param).
 
+**Route files:** `auth`, `chores`, `family`, `familyEvents`, `familyMembers`, `grocery`, `invites`, `kids`, `notes`, `notifications`, `projects`, `pushTokens`, `scheduleBlocks`.
+
 Schema is in `backend/src/db/schema.ts`. After schema changes: `npm run db:generate` → `npm run db:migrate`.
+
+### Design Tokens (`src/ui/tokens.ts`)
+Always use tokens — never hardcode colors or spacing.
+
+- **Colors (`C`):** `bg` (light gray), `surface` (white), `textPrimary`, `textSecondary`, `purple` (primary accent), `teal`, `red`, `amber`.
+- **Spacing (`S`):** 4-point grid — `xs:4`, `sm:8`, `md:12`, `lg:16`, `xl:24`, `xxl:32`.
+- **Radii (`R`):** `sm:8`, `md:12`, `lg:16`, `xl:20`.
+- **Shadows (`SHADOW`):** `sm`, `md`, `lg` — cross-platform (iOS shadow + Android elevation).
+
+### UI Components
+All modals use `ModalWrapper.tsx`. Each resource has its own `*Modal.tsx` for add/edit. Shared components:
+- `SectionHeader` — section title with optional action button
+- `FamilyBadge` — family name pill shown on every tab
+- `PinnedNotesCarousel` — horizontal scroll of pinned notes on Today screen
+- `ActiveProjectsCarousel` — horizontal scroll of active projects
+- `DatePicker` / `WheelTimePicker` — custom date/time pickers
+- `ConfirmDeleteModal` — reusable confirmation dialog
 
 ### i18n
 Hebrew-only. All strings in `src/i18n/he.ts`, accessed via helpers:
@@ -86,6 +204,8 @@ t("key", { count: 3 })     // {{count}} interpolation
 ### Path Aliases
 `@src/*` → `./src/*`, `@/*` → `./*` (configured in `tsconfig.json`).
 
+## Key Patterns
+
 ### Adding a New Resource
 1. Add model type in `src/models/`
 2. Add Drizzle table in `backend/src/db/schema.ts` + generate/migrate
@@ -94,3 +214,33 @@ t("key", { count: 3 })     // {{count}} interpolation
 5. Add store slice to `useFamilyStore.ts` (bump version + add migrate step)
 6. Add `*Remote` functions to `remoteCrud.ts`
 7. Add to `pullAll()` in `syncEngine.ts`
+
+### Cross-Platform Gotchas
+- **Android elevation shadows** don't match iOS `shadowX` props — test both. Avoid `elevation` on transparent/overlapping views.
+- **Keyboard avoiding:** iOS uses `behavior="padding"`, Android uses `behavior="height"` or `undefined`.
+- **Web `position: "fixed"`** needs casting: `Platform.OS === "web" && ({ position: "fixed" } as any)`.
+- **ScrollView vs FlatList:** FlatList has issues in some modal/nested contexts — prefer ScrollView for short, bounded lists.
+
+### Testing Changes
+Before considering any change done:
+1. `node_modules/.bin/tsc --noEmit` — type check
+2. `npx expo lint` — lint
+3. Visually verify on web (`npx expo start --web`)
+4. If touching layout/RTL: verify on Android emulator too (RTL behavior differs)
+
+### Session Logging
+Use the `/session-log` skill to append progress entries to the Session Log section below. Invoke it roughly every 10 significant tool uses (edits, writes, investigations) or when a meaningful milestone is reached. This preserves context across sessions so the next agent can pick up where you left off.
+
+## Session Log
+
+### 2026-05-23
+- Fixed `register.tsx` temporal dead zone bug — `joiningFamily` and `familyNameError` used before declaration
+- Verified all 5 web tabs render correctly (today, calendar, grocery, home, settings) with clean console
+- Enriched CLAUDE.md with auth flow, design tokens, UI components, and cross-platform gotchas
+- Created `/session-log` skill for automatic progress tracking across sessions
+- Redesigned `OnboardingWizard.tsx`: 5-step flow (Family Name → About You + Partner → Kids → Invite → Telegram)
+- Step 2 now guides user to create self first, then optionally add partner member
+- Added Step 4 invite partner screen with generate/copy/share code
+- Changed `_layout.tsx` auto-complete logic to only skip onboarding for users who already claimed a member
+- Added test login credentials to CLAUDE.md (כהן / 123456)
+- Added new i18n keys for wizard steps in `he.ts`
