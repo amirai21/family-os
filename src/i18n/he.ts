@@ -181,6 +181,7 @@ const he = {
     invalidDate: "תאריך לא תקין (YYYY-MM-DD)",
     reminders: "תזכורות",
     reminderMax3: "מקסימום 3 תזכורות",
+    daysOfWeekRequired: "יש לבחור לפחות יום אחד",
     delete: "מחיקת אירוע",
   },
 

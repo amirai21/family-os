@@ -345,11 +345,17 @@ export default function FamilyEventModal({
                     mode={sel ? "contained" : "outlined"}
                     compact
                     onPress={() => {
+                      // Allow deselecting freely — including the last day.
+                      // The Zod `daysOfWeek.min(1)` rule catches "no days at
+                      // all" on save, with the message rendered below. The
+                      // previous `cur.length > 1` guard made the button look
+                      // broken when it was the only selected day (QA Pass 2
+                      // BUG-N14 — silently unresponsive).
                       const cur = selectedDays;
                       if (cur.includes(idx)) {
-                        if (cur.length > 1) setValue("daysOfWeek", cur.filter((d) => d !== idx));
+                        setValue("daysOfWeek", cur.filter((d) => d !== idx), { shouldValidate: true });
                       } else {
-                        setValue("daysOfWeek", [...cur, idx]);
+                        setValue("daysOfWeek", [...cur, idx], { shouldValidate: true });
                       }
                     }}
                     style={MS.chip}
@@ -362,6 +368,11 @@ export default function FamilyEventModal({
                 );
               })}
             </View>
+            {errors.daysOfWeek && (
+              <Text style={[MS.error, { marginTop: 4 }]}>
+                {t("eventModal.daysOfWeekRequired")}
+              </Text>
+            )}
           </>
         )}
 

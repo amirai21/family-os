@@ -291,11 +291,13 @@ export default function ScheduleBlockModal({
                     mode={sel ? "contained" : "outlined"}
                     compact
                     onPress={() => {
+                      // Allow free deselect; schema catches "no days" at save
+                      // time. See QA Pass 2 BUG-N14.
                       const cur = selectedDays;
                       if (cur.includes(idx)) {
-                        if (cur.length > 1) setValue("daysOfWeek", cur.filter((d) => d !== idx));
+                        setValue("daysOfWeek", cur.filter((d) => d !== idx), { shouldValidate: true });
                       } else {
-                        setValue("daysOfWeek", [...cur, idx]);
+                        setValue("daysOfWeek", [...cur, idx], { shouldValidate: true });
                       }
                     }}
                     style={MS.chip}
@@ -308,6 +310,11 @@ export default function ScheduleBlockModal({
                 );
               })}
             </View>
+            {errors.daysOfWeek && (
+              <Text style={[MS.error, { marginTop: 4 }]}>
+                {t("eventModal.daysOfWeekRequired")}
+              </Text>
+            )}
           </>
         )}
 
