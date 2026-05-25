@@ -1,7 +1,6 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import type { GroceryItem, ShoppingCategory } from "@src/models/grocery";
 import type { Note } from "@src/models/note";
 import type { Chore } from "@src/models/chore";
@@ -11,6 +10,42 @@ import type { Kid } from "@src/models/kid";
 import type { FamilyMember, MemberRole } from "@src/models/familyMember";
 import type { FamilyEvent, AssigneeType } from "@src/models/familyEvent";
 import { makeId } from "@src/utils/id";
+
+/**
+ * Defensive storage wrapper that drops corrupt persisted state instead of
+ * letting JSON.parse throw and stall rehydration forever (which manifested as
+ * a permanent blank screen — see QA Pass 2 BUG #1).
+ *
+ * If the stored value is unparseable JSON, we:
+ *   1. log a warning,
+ *   2. remove the bad key so the next write starts fresh,
+ *   3. return null → Zustand treats it as "no persisted state" and uses defaults.
+ *
+ * After that, the next successful pullAll() backfills the store from the server.
+ */
+const safeStorage: StateStorage = {
+  getItem: async (name) => {
+    const raw = await AsyncStorage.getItem(name);
+    if (raw == null) return null;
+    try {
+      JSON.parse(raw);
+      return raw;
+    } catch (err) {
+      console.warn(
+        "[store] Persisted state is corrupt JSON; dropping and starting fresh.",
+        err,
+      );
+      try {
+        await AsyncStorage.removeItem(name);
+      } catch {
+        // ignore — worst case the next setItem overwrites it
+      }
+      return null;
+    }
+  },
+  setItem: (name, value) => AsyncStorage.setItem(name, value),
+  removeItem: (name) => AsyncStorage.removeItem(name),
+};
 
 /* ─── Sync status ─── */
 
@@ -529,7 +564,18 @@ export const useFamilyStore = create<FamilyState>()(
     {
       name: "family-os-store-v2",
       version: 11,
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => safeStorage),
+      onRehydrateStorage: () => (_state, error) => {
+        // Last-line-of-defense: if anything else in the rehydrate path throws
+        // (migration error, etc.), log it. The safeStorage wrapper above
+        // handles the most common cause (corrupt JSON) before we get here.
+        if (error) {
+          console.warn(
+            "[store] onRehydrateStorage error; continuing with defaults.",
+            error,
+          );
+        }
+      },
       partialize: (state) => ({
         familyName: state.familyName,
         grocery: state.grocery,
