@@ -62,43 +62,51 @@ export async function pullAll(familyIdOverride?: string): Promise<void> {
       familyEventsApi.list(fid),
     ]);
 
-    const val = <T,>(r: PromiseSettledResult<T>, fallback: T): T =>
-      r.status === "fulfilled" ? r.value : fallback;
-
-    const familyList = val(results[0], []);
-    const grocery = val(results[1], []);
-    const notes = val(results[2], []);
-    const chores = val(results[3], []);
-    const projects = val(results[4], []);
-    const kids = val(results[5], []);
-    const scheduleBlocks = val(results[6], []);
-    const familyMembers = val(results[7], []);
-    const familyEvents = val(results[8], []);
-
-    // Log any failures
+    // Log any failures and figure out which endpoints succeeded.
+    // CRITICAL: we only call store.setX() for endpoints that succeeded.
+    // The previous version did `val(rejected, [])` and then `store.setX([])`,
+    // which silently *wiped* the local cache for any failed resource — a flaky
+    // network hop would erase your grocery list / events / etc. instead of
+    // showing the previous data with a sync-error banner.
+    const names = ["families", "grocery", "notes", "chores", "projects", "kids", "scheduleBlocks", "members", "events"];
     const failures = results
       .map((r, i) => (r.status === "rejected" ? i : null))
-      .filter((i) => i !== null);
+      .filter((i): i is number => i !== null);
     if (failures.length > 0) {
-      const names = ["families", "grocery", "notes", "chores", "projects", "kids", "scheduleBlocks", "members", "events"];
       const failedNames = failures.map((i) => names[i]).join(", ");
-      console.warn(`[sync] Partial pull — failed: ${failedNames}`);
+      console.warn(`[sync] Partial pull — keeping local cache for: ${failedNames}`);
     }
 
-    // Set family name from matching family
-    const currentFamily = familyList.find((f) => f.id === fid);
-    if (currentFamily) {
-      store.setFamilyName(currentFamily.name);
+    // Helper: apply `setX(mapped)` ONLY when the corresponding fetch succeeded.
+    // For rejected endpoints, we do nothing — local cache stays as-is.
+    const applyIfOk = <T, U>(
+      idx: number,
+      mapper: (raw: T) => U,
+      setter: (mapped: U[]) => void,
+    ) => {
+      const r = results[idx];
+      if (r.status === "fulfilled") {
+        setter((r.value as T[]).map(mapper));
+      }
+    };
+
+    // Set family name from matching family (only if family list succeeded)
+    if (results[0].status === "fulfilled") {
+      const familyList = results[0].value as { id: string; name: string }[];
+      const currentFamily = familyList.find((f) => f.id === fid);
+      if (currentFamily) {
+        store.setFamilyName(currentFamily.name);
+      }
     }
 
-    store.setGrocery(grocery.map(apiToLocalGrocery));
-    store.setNotes(notes.map(apiToLocalNote));
-    store.setChores(chores.map(apiToLocalChore));
-    store.setProjects(projects.map(apiToLocalProject));
-    store.setKids(kids.map(apiToLocalKid));
-    store.setScheduleBlocks(scheduleBlocks.map(apiToLocalScheduleBlock));
-    store.setFamilyMembers(familyMembers.map(apiToLocalFamilyMember));
-    store.setFamilyEvents(familyEvents.map(apiToLocalFamilyEvent));
+    applyIfOk(1, apiToLocalGrocery, store.setGrocery);
+    applyIfOk(2, apiToLocalNote, store.setNotes);
+    applyIfOk(3, apiToLocalChore, store.setChores);
+    applyIfOk(4, apiToLocalProject, store.setProjects);
+    applyIfOk(5, apiToLocalKid, store.setKids);
+    applyIfOk(6, apiToLocalScheduleBlock, store.setScheduleBlocks);
+    applyIfOk(7, apiToLocalFamilyMember, store.setFamilyMembers);
+    applyIfOk(8, apiToLocalFamilyEvent, store.setFamilyEvents);
     store.setLastSyncedAt(Date.now());
     store.setSyncStatus(failures.length > 0 ? "error" : "idle",
       failures.length > 0 ? "Partial sync" : undefined);
