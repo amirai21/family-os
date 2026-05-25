@@ -7,6 +7,14 @@
  *   3. On error → call onSyncError callback (for Snackbar).
  *
  * The app stays responsive even if the API is down.
+ *
+ * Update semantics: each `update*Remote(id, patch)` sends a PATCH containing
+ * ONLY the fields actually in `patch`. This is critical for two-parent
+ * concurrent edit safety — if both parents change different fields of the
+ * same event, each PATCH carries only their delta and the server merges
+ * field-by-field. The previous implementation read the full local item and
+ * PUT/upserted it, which meant Parent B's stale title overwrote Parent A's
+ * rename (lost-update race). See QA Pass 2 BUG-N1.
  */
 
 import { useFamilyStore } from "@src/store/useFamilyStore";
@@ -33,7 +41,6 @@ import {
   localToApiFamilyEvent,
   apiToLocalFamilyMember,
 } from "../api/mappers";
-import type { GroceryItem } from "@src/models/grocery";
 import type { Note } from "@src/models/note";
 import type { Chore } from "@src/models/chore";
 import type { Project } from "@src/models/project";
@@ -101,12 +108,13 @@ export function addGroceryRemote(input: {
 
 export function updateGroceryRemote(id: string, patch: { title?: string; subcategory?: string; qty?: string }) {
   useFamilyStore.getState().updateGrocery(id, patch);
+  // Send PATCH with only the changed fields — see BUG-N1 note in module header.
+  const apiPatch: Partial<{ title: string; subcategory: string | null; qty: string | null }> = {};
+  if (patch.title !== undefined) apiPatch.title = patch.title;
+  if (patch.subcategory !== undefined) apiPatch.subcategory = patch.subcategory ?? null;
+  if (patch.qty !== undefined) apiPatch.qty = patch.qty ?? null;
   fireAndForget(
-    getFamilyId().then((fid) => {
-      const item = useFamilyStore.getState().grocery.find((g) => g.id === id);
-      if (!item) return;
-      return groceryApi.upsert(fid, localToApiGrocery(item));
-    }),
+    getFamilyId().then((fid) => groceryApi.update(fid, id, apiPatch)),
     "Update grocery",
   );
 }
@@ -170,12 +178,12 @@ export function updateNoteRemote(
   patch: Partial<Pick<Note, "title" | "body">>,
 ) {
   useFamilyStore.getState().updateNote(id, patch);
-  const item = useFamilyStore.getState().notes.find((n) => n.id === id);
-  if (!item) return;
+  // PATCH with only changed fields — see BUG-N1 note in module header.
+  const apiPatch: Partial<{ title: string | null; body: string }> = {};
+  if (patch.title !== undefined) apiPatch.title = patch.title ?? null;
+  if (patch.body !== undefined) apiPatch.body = patch.body;
   fireAndForget(
-    getFamilyId().then((fid) =>
-      notesApi.upsert(fid, localToApiNote(item)),
-    ),
+    getFamilyId().then((fid) => notesApi.update(fid, id, apiPatch)),
     "Update note",
   );
 }
@@ -223,12 +231,13 @@ export function updateChoreRemote(
   patch: Partial<Pick<Chore, "title" | "assignedToMemberId">>,
 ) {
   useFamilyStore.getState().updateChore(id, patch);
-  const item = useFamilyStore.getState().chores.find((c) => c.id === id);
-  if (!item) return;
+  // PATCH with only changed fields — see BUG-N1 note in module header.
+  const apiPatch: Partial<{ title: string; assignedToMemberId: string | null }> = {};
+  if (patch.title !== undefined) apiPatch.title = patch.title;
+  if (patch.assignedToMemberId !== undefined)
+    apiPatch.assignedToMemberId = patch.assignedToMemberId ?? null;
   fireAndForget(
-    getFamilyId().then((fid) =>
-      choresApi.upsert(fid, localToApiChore(item)),
-    ),
+    getFamilyId().then((fid) => choresApi.update(fid, id, apiPatch)),
     "Update chore",
   );
 }
@@ -287,12 +296,19 @@ export function updateProjectRemote(
   patch: Partial<Pick<Project, "title" | "description" | "status" | "progress">>,
 ) {
   useFamilyStore.getState().updateProject(id, patch);
-  const item = useFamilyStore.getState().projects.find((p) => p.id === id);
-  if (!item) return;
+  // PATCH with only changed fields — see BUG-N1 note in module header.
+  const apiPatch: Partial<{
+    title: string;
+    description: string | null;
+    status: import("@src/models/project").ProjectStatus;
+    progress: number;
+  }> = {};
+  if (patch.title !== undefined) apiPatch.title = patch.title;
+  if (patch.description !== undefined) apiPatch.description = patch.description ?? null;
+  if (patch.status !== undefined) apiPatch.status = patch.status;
+  if (patch.progress !== undefined) apiPatch.progress = patch.progress;
   fireAndForget(
-    getFamilyId().then((fid) =>
-      projectsApi.upsert(fid, localToApiProject(item)),
-    ),
+    getFamilyId().then((fid) => projectsApi.update(fid, id, apiPatch)),
     "Update project",
   );
 }
@@ -341,14 +357,25 @@ export function updateScheduleBlockRemote(
   >,
 ) {
   useFamilyStore.getState().updateScheduleBlock(id, patch);
-  const block = useFamilyStore
-    .getState()
-    .scheduleBlocks.find((b) => b.id === id);
-  if (!block) return;
+  // PATCH with only changed fields — see BUG-N1 note in module header.
+  // `reminders` is stored as JSON string on the wire.
+  const apiPatch: Record<string, unknown> = {};
+  if (patch.daysOfWeek !== undefined) apiPatch.daysOfWeek = patch.daysOfWeek;
+  if (patch.title !== undefined) apiPatch.title = patch.title;
+  if (patch.type !== undefined) apiPatch.type = patch.type;
+  if (patch.startMinutes !== undefined) apiPatch.startMinutes = patch.startMinutes;
+  if (patch.endMinutes !== undefined) apiPatch.endMinutes = patch.endMinutes;
+  if (patch.location !== undefined) apiPatch.location = patch.location ?? null;
+  if (patch.color !== undefined) apiPatch.color = patch.color ?? null;
+  if (patch.isRecurring !== undefined) apiPatch.isRecurring = patch.isRecurring;
+  if (patch.date !== undefined) apiPatch.date = patch.date ?? null;
+  if (patch.reminders !== undefined)
+    apiPatch.reminders =
+      patch.reminders && patch.reminders.length > 0
+        ? JSON.stringify(patch.reminders)
+        : null;
   fireAndForget(
-    getFamilyId().then((fid) =>
-      scheduleBlocksApi.upsert(fid, localToApiScheduleBlock(block)),
-    ),
+    getFamilyId().then((fid) => scheduleBlocksApi.update(fid, id, apiPatch)),
     "Update schedule block",
   );
 }
@@ -384,12 +411,13 @@ export function updateKidRemote(
   patch: Partial<Pick<Kid, "name" | "emoji" | "color">>,
 ) {
   useFamilyStore.getState().updateKid(id, patch);
-  const item = useFamilyStore.getState().kids.find((k) => k.id === id);
-  if (!item) return;
+  // PATCH with only changed fields — see BUG-N1 note in module header.
+  const apiPatch: Partial<{ name: string; emoji: string; color: string }> = {};
+  if (patch.name !== undefined) apiPatch.name = patch.name;
+  if (patch.emoji !== undefined) apiPatch.emoji = patch.emoji;
+  if (patch.color !== undefined) apiPatch.color = patch.color;
   fireAndForget(
-    getFamilyId().then((fid) =>
-      kidsApi.upsert(fid, localToApiKid(item)),
-    ),
+    getFamilyId().then((fid) => kidsApi.update(fid, id, apiPatch)),
     "Update kid",
   );
 }
@@ -430,14 +458,19 @@ export function updateFamilyMemberRemote(
   patch: Partial<Pick<FamilyMember, "name" | "role" | "color" | "avatarEmoji">>,
 ) {
   useFamilyStore.getState().updateFamilyMember(id, patch);
-  const item = useFamilyStore
-    .getState()
-    .familyMembers.find((m) => m.id === id);
-  if (!item) return;
+  // PATCH with only changed fields — see BUG-N1 note in module header.
+  const apiPatch: Partial<{
+    name: string;
+    role: MemberRole;
+    color: string | null;
+    avatarEmoji: string | null;
+  }> = {};
+  if (patch.name !== undefined) apiPatch.name = patch.name;
+  if (patch.role !== undefined) apiPatch.role = patch.role;
+  if (patch.color !== undefined) apiPatch.color = patch.color ?? null;
+  if (patch.avatarEmoji !== undefined) apiPatch.avatarEmoji = patch.avatarEmoji ?? null;
   fireAndForget(
-    getFamilyId().then((fid) =>
-      familyMembersApi.upsert(fid, localToApiFamilyMember(item)),
-    ),
+    getFamilyId().then((fid) => familyMembersApi.update(fid, id, apiPatch)),
     "Update family member",
   );
 }
@@ -503,14 +536,26 @@ export function updateFamilyEventRemote(
   >,
 ) {
   useFamilyStore.getState().updateFamilyEvent(id, patch);
-  const item = useFamilyStore
-    .getState()
-    .familyEvents.find((e) => e.id === id);
-  if (!item) return;
+  // PATCH with only changed fields — see BUG-N1 note in module header.
+  // `reminders` is stored as JSON string on the wire.
+  const apiPatch: Record<string, unknown> = {};
+  if (patch.title !== undefined) apiPatch.title = patch.title;
+  if (patch.assigneeType !== undefined) apiPatch.assigneeType = patch.assigneeType;
+  if (patch.assigneeId !== undefined) apiPatch.assigneeId = patch.assigneeId ?? null;
+  if (patch.daysOfWeek !== undefined) apiPatch.daysOfWeek = patch.daysOfWeek;
+  if (patch.startMinutes !== undefined) apiPatch.startMinutes = patch.startMinutes;
+  if (patch.endMinutes !== undefined) apiPatch.endMinutes = patch.endMinutes;
+  if (patch.location !== undefined) apiPatch.location = patch.location ?? null;
+  if (patch.color !== undefined) apiPatch.color = patch.color ?? null;
+  if (patch.isRecurring !== undefined) apiPatch.isRecurring = patch.isRecurring;
+  if (patch.date !== undefined) apiPatch.date = patch.date ?? null;
+  if (patch.reminders !== undefined)
+    apiPatch.reminders =
+      patch.reminders && patch.reminders.length > 0
+        ? JSON.stringify(patch.reminders)
+        : null;
   fireAndForget(
-    getFamilyId().then((fid) =>
-      familyEventsApi.upsert(fid, localToApiFamilyEvent(item)),
-    ),
+    getFamilyId().then((fid) => familyEventsApi.update(fid, id, apiPatch)),
     "Update family event",
   );
 }
