@@ -445,11 +445,16 @@ export default function FamilyEventModal({
         <View style={MS.chipRow}>
           {REMINDER_PRESETS.map(({ minutes, label }) => {
             const selected = selectedReminders.includes(minutes);
+            // Disable unselected presets once cap is hit, so the user gets
+            // visual feedback that the click would be a no-op (BUG-N13 —
+            // previously the 4th click was silently swallowed).
+            const capReached = !selected && selectedReminders.length >= 3;
             return (
               <Button
                 key={minutes}
                 mode={selected ? "contained" : "outlined"}
                 compact
+                disabled={capReached}
                 onPress={() => {
                   if (selected) {
                     setSelectedReminders((prev) => prev.filter((m) => m !== minutes));
@@ -467,6 +472,18 @@ export default function FamilyEventModal({
             );
           })}
         </View>
+        {selectedReminders.length >= 3 && (
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              marginTop: 4,
+              textAlign: "right",
+            }}
+          >
+            {t("eventModal.reminderMax3")}
+          </Text>
+        )}
       </View>
 
       {/* ── Delete ── */}

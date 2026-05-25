@@ -180,6 +180,7 @@ const he = {
     dateRequired: "תאריך הוא שדה חובה",
     invalidDate: "תאריך לא תקין (YYYY-MM-DD)",
     reminders: "תזכורות",
+    reminderMax3: "מקסימום 3 תזכורות",
     delete: "מחיקת אירוע",
   },
 

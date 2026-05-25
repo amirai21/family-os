@@ -399,11 +399,14 @@ export default function ScheduleBlockModal({
         <View style={MS.chipRow}>
           {REMINDER_PRESETS.map(({ minutes, label }) => {
             const selected = selectedReminders.includes(minutes);
+            // Disable unselected presets once cap is hit (BUG-N13).
+            const capReached = !selected && selectedReminders.length >= 3;
             return (
               <Button
                 key={minutes}
                 mode={selected ? "contained" : "outlined"}
                 compact
+                disabled={capReached}
                 onPress={() => {
                   if (selected) {
                     setSelectedReminders((prev) =>
@@ -423,6 +426,18 @@ export default function ScheduleBlockModal({
             );
           })}
         </View>
+        {selectedReminders.length >= 3 && (
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              marginTop: 4,
+              textAlign: "right",
+            }}
+          >
+            {t("eventModal.reminderMax3")}
+          </Text>
+        )}
       </View>
 
       {/* ── Delete ── */}
