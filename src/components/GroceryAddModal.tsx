@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { SUBCATEGORIES } from "@src/models/grocery";
@@ -40,9 +40,21 @@ export default function GroceryAddModal({
   // Whether the user has manually picked a category — stops auto-inference
   // from overriding their choice when they keep typing.
   const [categoryTouched, setCategoryTouched] = useState(false);
+  // In-flight guard against rapid double-clicks creating duplicate rows
+  // (QA Pass 1 BUG #2 — 5 clicks created 5 server rows).
+  //
+  // We use BOTH a ref and a state:
+  //  - submittingRef.current is the synchronous guard. Within the same JS tick,
+  //    React state updates haven't flushed yet, so a useState alone leaves all
+  //    rapid clicks reading `submitting=false` from the same closure.
+  //  - submitting (state) drives the visual disabled/loading on the button.
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
+    submittingRef.current = false;
+    setSubmitting(false);
     if (editItem) {
       setTitle(editItem.title);
       setSubcategory(editItem.subcategory ?? "Other");
@@ -74,7 +86,10 @@ export default function GroceryAddModal({
   };
 
   const handleSubmit = () => {
+    if (submittingRef.current) return; // double-click guard (synchronous)
     if (!title.trim()) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     if (isEditing) {
       updateGroceryRemote(editItem.id, {
         title: title.trim(),
@@ -177,7 +192,8 @@ export default function GroceryAddModal({
         <Button
           mode="contained"
           onPress={handleSubmit}
-          disabled={!title.trim()}
+          disabled={!title.trim() || submitting}
+          loading={submitting}
           style={MS.saveBtn}
           labelStyle={MS.saveBtnLabel}
         >

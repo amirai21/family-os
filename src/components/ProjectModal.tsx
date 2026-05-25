@@ -164,8 +164,14 @@ export default function ProjectModal({ visible, onDismiss, editProject }: Props)
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("idea");
   const [progress, setProgress] = useState(0);
+  // In-flight guard against rapid double-clicks (QA Pass 1 BUG #2).
+  // Ref for synchronous re-entrancy check; state for visual disabled/loading.
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    submittingRef.current = false;
+    setSubmitting(false);
     if (editProject) {
       setTitle(editProject.title);
       setDescription(editProject.description ?? "");
@@ -179,7 +185,10 @@ export default function ProjectModal({ visible, onDismiss, editProject }: Props)
   const reset = () => { setTitle(""); setDescription(""); setStatus("idea"); setProgress(0); };
 
   const handleSubmit = () => {
+    if (submittingRef.current) return; // double-click guard (synchronous)
     if (!title.trim()) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     if (editProject) {
       updateProjectRemote(editProject.id, {
         title: title.trim(),
@@ -252,7 +261,12 @@ export default function ProjectModal({ visible, onDismiss, editProject }: Props)
 
       <View style={MS.actions}>
         <Button onPress={handleDismiss}>{t("cancel")}</Button>
-        <Button mode="contained" onPress={handleSubmit} disabled={!title.trim()}>
+        <Button
+          mode="contained"
+          onPress={handleSubmit}
+          disabled={!title.trim() || submitting}
+          loading={submitting}
+        >
           {editProject ? t("save") : t("add")}
         </Button>
       </View>

@@ -3,7 +3,7 @@
  * Premium styled modal with sectioned layout.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { View } from "react-native";
 import { Text, TextInput, Button, SegmentedButtons } from "react-native-paper";
 import { useForm, Controller } from "react-hook-form";
@@ -175,7 +175,21 @@ export default function FamilyEventModal({
   const isRecurring = watch("isRecurring");
   const assigneeId = watch("assigneeId");
 
+  // In-flight guard against rapid double-clicks (QA Pass 1 BUG #2).
+  // Ref for synchronous re-entrancy check; state for visual disabled/loading.
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    if (visible) {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  }, [visible]);
+
   const doSubmit = (data: FormData) => {
+    if (submittingRef.current) return; // double-click guard (synchronous)
+    submittingRef.current = true;
+    setSubmitting(true);
     const daysOfWeek = data.isRecurring
       ? data.daysOfWeek
       : [dayOfWeekFromYMD(data.date!)];
@@ -483,6 +497,8 @@ export default function FamilyEventModal({
         <Button
           mode="contained"
           onPress={handleSubmit(doSubmit)}
+          disabled={submitting}
+          loading={submitting}
           style={MS.saveBtn}
           labelStyle={MS.saveBtnLabel}
         >

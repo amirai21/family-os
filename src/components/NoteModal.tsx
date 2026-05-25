@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import type { Note } from "@src/models/note";
@@ -16,8 +16,14 @@ interface Props {
 export default function NoteModal({ visible, onDismiss, editNote }: Props) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  // In-flight guard against rapid double-clicks (QA Pass 1 BUG #2).
+  // Ref for synchronous re-entrancy check; state for visual disabled/loading.
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    submittingRef.current = false;
+    setSubmitting(false);
     if (editNote) {
       setTitle(editNote.title ?? "");
       setBody(editNote.body);
@@ -30,7 +36,10 @@ export default function NoteModal({ visible, onDismiss, editNote }: Props) {
   const reset = () => { setTitle(""); setBody(""); };
 
   const handleSubmit = () => {
+    if (submittingRef.current) return; // double-click guard (synchronous)
     if (!body.trim()) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     if (editNote) {
       updateNoteRemote(editNote.id, {
         title: title.trim() || undefined,
@@ -73,7 +82,12 @@ export default function NoteModal({ visible, onDismiss, editNote }: Props) {
 
       <View style={MS.actions}>
         <Button onPress={handleDismiss}>{t("cancel")}</Button>
-        <Button mode="contained" onPress={handleSubmit} disabled={!body.trim()}>
+        <Button
+          mode="contained"
+          onPress={handleSubmit}
+          disabled={!body.trim() || submitting}
+          loading={submitting}
+        >
           {editNote ? t("save") : t("add")}
         </Button>
       </View>

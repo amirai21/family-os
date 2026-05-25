@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { addChoreRemote, updateChoreRemote } from "@src/lib/sync/remoteCrud";
@@ -19,8 +19,14 @@ export default function ChoreAddModal({ visible, onDismiss, editChore }: Props) 
   const activeMembers = familyMembers.filter((m) => m.isActive);
   const [title, setTitle] = useState("");
   const [assignedToMemberId, setAssignedToMemberId] = useState<string | undefined>(undefined);
+  // In-flight guard against rapid double-clicks (QA Pass 1 BUG #2).
+  // Ref for synchronous re-entrancy check; state for visual disabled/loading.
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    submittingRef.current = false;
+    setSubmitting(false);
     if (editChore) {
       setTitle(editChore.title);
       setAssignedToMemberId(editChore.assignedToMemberId);
@@ -33,7 +39,10 @@ export default function ChoreAddModal({ visible, onDismiss, editChore }: Props) 
   const reset = () => { setTitle(""); setAssignedToMemberId(undefined); };
 
   const handleSubmit = () => {
+    if (submittingRef.current) return; // double-click guard (synchronous)
     if (!title.trim()) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     if (editChore) {
       updateChoreRemote(editChore.id, {
         title: title.trim(),
@@ -98,7 +107,12 @@ export default function ChoreAddModal({ visible, onDismiss, editChore }: Props) 
 
       <View style={MS.actions}>
         <Button onPress={handleDismiss}>{t("cancel")}</Button>
-        <Button mode="contained" onPress={handleSubmit} disabled={!title.trim()}>
+        <Button
+          mode="contained"
+          onPress={handleSubmit}
+          disabled={!title.trim() || submitting}
+          loading={submitting}
+        >
           {editChore ? t("save") : t("add")}
         </Button>
       </View>
