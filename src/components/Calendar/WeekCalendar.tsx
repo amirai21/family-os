@@ -41,6 +41,10 @@ interface Props {
   accentColor?: string;
   onEventPress?: (id: string, source: "event" | "block") => void;
   onSlotPress?: (date: string, startMinutes: number, endMinutes: number) => void;
+  // When set, show ONLY this kid's items: family events assigned to the kid
+  // (assigneeType==="kid" && assigneeId===kidId) and the kid's schedule
+  // blocks. Unset = the family-wide view (all events + all kids' blocks).
+  kidId?: string;
 }
 
 interface EventItem {
@@ -177,6 +181,7 @@ export default function WeekCalendar({
   accentColor = DEFAULT_ACCENT,
   onEventPress,
   onSlotPress,
+  kidId,
 }: Props) {
   // ── Week navigation ──
   const [weekOffset, setWeekOffset] = React.useState(0);
@@ -224,6 +229,11 @@ export default function WeekCalendar({
   const familyMembers = useFamilyStore((s) => s.familyMembers);
 
   const weekEvents = useMemo<Record<string, LayoutedEvent[]>>(() => {
+    // Kid scope: keep only this kid's family events / blocks. Unset = all.
+    const keepEvent = (e: { assigneeType: string; assigneeId?: string }) =>
+      !kidId || (e.assigneeType === "kid" && e.assigneeId === kidId);
+    const keepBlock = (b: { kidId: string }) => !kidId || b.kidId === kidId;
+
     const result: Record<string, LayoutedEvent[]> = {};
     for (const day of days) {
       const dow = day.getDay();
@@ -231,7 +241,7 @@ export default function WeekCalendar({
       const items: EventItem[] = [];
 
       // Family – recurring
-      for (const e of familyRecurringByDow[dow] ?? []) {
+      for (const e of (familyRecurringByDow[dow] ?? []).filter(keepEvent)) {
         const icon = e.assigneeType === "kid" && e.assigneeId
           ? (kids.find((k) => k.id === e.assigneeId)?.emoji ?? "👨‍👩‍👧‍👦")
           : e.assigneeType === "member" && e.assigneeId
@@ -254,7 +264,7 @@ export default function WeekCalendar({
         });
       }
       // Family – one-time
-      for (const e of familyOneTimeEvents) {
+      for (const e of familyOneTimeEvents.filter(keepEvent)) {
         if (e.date === dateStr) {
           const icon = e.assigneeType === "kid" && e.assigneeId
             ? (kids.find((k) => k.id === e.assigneeId)?.emoji ?? "👨‍👩‍👧‍👦")
@@ -279,7 +289,7 @@ export default function WeekCalendar({
         }
       }
       // Kid blocks – recurring
-      for (const b of kidRecurringByDow[dow] ?? []) {
+      for (const b of (kidRecurringByDow[dow] ?? []).filter(keepBlock)) {
         const kid = kids.find((k) => k.id === b.kidId);
         items.push({
           id: b.id,
@@ -292,7 +302,7 @@ export default function WeekCalendar({
         });
       }
       // Kid blocks – one-time
-      for (const b of kidOneTimeBlocks) {
+      for (const b of kidOneTimeBlocks.filter(keepBlock)) {
         if (b.date === dateStr) {
           const kid = kids.find((k) => k.id === b.kidId);
           items.push({
@@ -310,7 +320,7 @@ export default function WeekCalendar({
       result[dateStr] = layoutEvents(items);
     }
     return result;
-  }, [days, familyRecurringByDow, familyOneTimeEvents, kidRecurringByDow, kidOneTimeBlocks, kids, familyMembers]);
+  }, [days, familyRecurringByDow, familyOneTimeEvents, kidRecurringByDow, kidOneTimeBlocks, kids, familyMembers, kidId]);
 
   // ── Hour labels ──
   const hours = useMemo(() => {

@@ -98,6 +98,9 @@ const he = {
     noBlocks: "אין בלוקים",
     kidSchedule: "המערכת של {{name}}",
     oneTimeEvent: "חד פעמי",
+    familyEventTag: "אירוע",
+    prevKid: "ילד קודם",
+    nextKid: "ילד הבא",
   },
 
   // ── Grocery Add Modal ──

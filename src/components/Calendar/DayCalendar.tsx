@@ -30,6 +30,8 @@ interface Props {
   accentColor?: string;
   onEventPress?: (id: string, source: "event" | "block") => void;
   onSlotPress?: (date: string, startMinutes: number, endMinutes: number) => void;
+  // When set, show ONLY this kid's items (see WeekCalendar). Unset = all.
+  kidId?: string;
 }
 
 interface EventItem {
@@ -149,12 +151,28 @@ export default function DayCalendar({
   accentColor = DEFAULT_ACCENT,
   onEventPress,
   onSlotPress,
+  kidId,
 }: Props) {
   const selectedDow = dayOfWeekFromYMD(selectedDate);
-  const familyEvents = useFamilyEventsForDate(selectedDate, selectedDow);
-  const kidBlocks = useAllKidBlocksForDate(selectedDate, selectedDow);
+  const familyEventsAll = useFamilyEventsForDate(selectedDate, selectedDow);
+  const kidBlocksAll = useAllKidBlocksForDate(selectedDate, selectedDow);
   const kids = useFamilyStore((s) => s.kids);
   const familyMembers = useFamilyStore((s) => s.familyMembers);
+
+  // Kid scope: keep only this kid's events/blocks. Unset = all.
+  const familyEvents = useMemo(
+    () =>
+      kidId
+        ? familyEventsAll.filter(
+            (e) => e.assigneeType === "kid" && e.assigneeId === kidId,
+          )
+        : familyEventsAll,
+    [familyEventsAll, kidId],
+  );
+  const kidBlocks = useMemo(
+    () => (kidId ? kidBlocksAll.filter((b) => b.kidId === kidId) : kidBlocksAll),
+    [kidBlocksAll, kidId],
+  );
 
   const goBack = useCallback(
     () => onSelectDate(addDaysToYMD(selectedDate, -1)),

@@ -4,7 +4,7 @@
  * Route: /kid/:kidId
  */
 
-import React, { useState, useMemo, useLayoutEffect } from "react";
+import React, { useState, useMemo, useLayoutEffect, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Platform } from "react-native";
 import {
   Text,
@@ -15,7 +15,7 @@ import {
   FAB,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 
 import { useFamilyStore } from "@src/store/useFamilyStore";
@@ -25,11 +25,19 @@ import {
   useKidOneTimeBlocks,
 } from "@src/store/scheduleSelectors";
 import {
+  useFamilyEventsForDate,
+  useFamilyEventOneTimeBlocks,
+  useFamilyEventRecurringByDay,
+} from "@src/store/familyEventSelectors";
+import {
   addScheduleBlockRemote,
   updateScheduleBlockRemote,
   deleteScheduleBlockRemote,
+  updateFamilyEventRemote,
+  deleteFamilyEventRemote,
 } from "@src/lib/sync/remoteCrud";
 import type { ScheduleBlock, BlockType } from "@src/models/schedule";
+import type { FamilyEvent, AssigneeType } from "@src/models/familyEvent";
 import { minutesToHHMM } from "@src/utils/time";
 import { toYMD, dayOfWeekFromYMD } from "@src/utils/date";
 import { t, dayName, blockTypeLabel } from "@src/i18n";
@@ -38,10 +46,15 @@ import { C, R, S } from "@src/ui/tokens";
 import { TYPE_COLORS } from "@src/ui/semanticColors";
 
 import MonthCalendar from "@src/components/Calendar/MonthCalendar";
+import WeekCalendar from "@src/components/Calendar/WeekCalendar";
+import DayCalendar from "@src/components/Calendar/DayCalendar";
 import ScheduleBlockModal from "@src/components/ScheduleBlockModal";
+import FamilyEventModal from "@src/components/FamilyEventModal";
 import SectionHeader from "@src/components/SectionHeader";
 import ConfirmDeleteModal from "@src/components/ConfirmDeleteModal";
 import { useConfirmDelete } from "@src/hooks/useConfirmDelete";
+
+type CalendarView = "month" | "week" | "day";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,6 +111,54 @@ function BlockRow({
   );
 }
 
+function KidEventRow({
+  event,
+  onEdit,
+  onDelete,
+}: {
+  event: FamilyEvent;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  // Kid-assigned family event. We're already scoped to one kid, so no
+  // assignee badge — just a small "event" tag to distinguish it from a
+  // schedule block (which carries a type chip instead).
+  const color = event.color ?? C.purple;
+  return (
+    <Pressable
+      style={({ hovered }: any) => [
+        styles.blockRow,
+        hovered && styles.blockRowHover,
+      ]}
+      onPress={onEdit}
+    >
+      <View style={[styles.blockStripe, { backgroundColor: color }]} />
+      <View style={styles.blockInfo}>
+        <View style={styles.blockTitleRow}>
+          <Text variant="bodyMedium" style={styles.blockTitle}>
+            {event.title}
+          </Text>
+          {!event.isRecurring && (
+            <Text style={styles.oneTimeBadge}>{t("kid.oneTimeEvent")}</Text>
+          )}
+        </View>
+        <Text variant="bodySmall" style={styles.blockTime}>
+          {minutesToHHMM(event.startMinutes)} – {minutesToHHMM(event.endMinutes)}
+          {event.location ? `  ·  ${event.location}` : ""}
+        </Text>
+      </View>
+      <Chip
+        compact
+        textStyle={{ fontSize: 10, color: C.purple }}
+        style={[styles.typeChip, { backgroundColor: C.purple + "22" }]}
+      >
+        {t("kid.familyEventTag")}
+      </Chip>
+      <IconButton icon="trash-can-outline" size={18} onPress={onDelete} />
+    </Pressable>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
@@ -107,8 +168,35 @@ export default function KidScheduleScreen() {
   const storeKids = useFamilyStore((s) => s.kids);
 
   const navigation = useNavigation();
+  const router = useRouter();
   const kid = storeKids.find((k) => k.id === kidId);
   const kidColor = kid?.color ?? C.purple;
+
+  // Cyclic prev/next over the family's ACTIVE kids, in the store's natural
+  // order. Wraps at the ends. If only one (or zero) active kid exists, both
+  // ids are null and the arrows hide.
+  const activeKids = useMemo(
+    () => storeKids.filter((k) => k.isActive),
+    [storeKids],
+  );
+  const { prevKidId, nextKidId } = useMemo(() => {
+    if (activeKids.length <= 1) return { prevKidId: null, nextKidId: null };
+    const idx = activeKids.findIndex((k) => k.id === kidId);
+    if (idx === -1) return { prevKidId: null, nextKidId: null };
+    const len = activeKids.length;
+    return {
+      prevKidId: activeKids[(idx - 1 + len) % len]!.id,
+      nextKidId: activeKids[(idx + 1) % len]!.id,
+    };
+  }, [activeKids, kidId]);
+
+  // replace (not push) so repeated kid swaps don't grow the back stack —
+  // back from /kid/A → /kid/B → /kid/C should still pop to wherever the
+  // user came from (today/calendar), not walk back through each kid.
+  const goToKid = useCallback(
+    (id: string) => router.replace(`/kid/${id}` as any),
+    [router],
+  );
 
   // Set header options once
   useLayoutEffect(() => {
@@ -119,13 +207,25 @@ export default function KidScheduleScreen() {
     });
   }, [navigation, kid?.name, kid?.emoji, kidColor]);
 
-  // Tab
+  // Tab + calendar sub-view (month/week/day, mirroring the main /calendar)
   const [tab, setTab] = useState("calendar");
+  const [calendarView, setCalendarView] = useState<CalendarView>("month");
 
   // Calendar state
   const [selectedDate, setSelectedDate] = useState(toYMD(new Date()));
   const selectedDow = dayOfWeekFromYMD(selectedDate);
+
+  // ── This kid's items for the selected date: schedule blocks + any family
+  //    events assigned to this kid. ──
   const dayBlocks = useKidBlocksForDate(kidId!, selectedDate, selectedDow);
+  const familyEventsForDate = useFamilyEventsForDate(selectedDate, selectedDow);
+  const dayEvents = useMemo(
+    () =>
+      familyEventsForDate.filter(
+        (e) => e.assigneeType === "kid" && e.assigneeId === kidId,
+      ),
+    [familyEventsForDate, kidId],
+  );
 
   // Template — all recurring blocks grouped by day
   const allBlocks = useKidBlocks(kidId!);
@@ -140,15 +240,37 @@ export default function KidScheduleScreen() {
     return map;
   }, [allBlocks]);
 
-  // One-time events for calendar dots
+  // For calendar dots + grid-press lookup: one-time blocks, plus this kid's
+  // recurring + one-time family events.
   const oneTimeBlocks = useKidOneTimeBlocks(kidId!);
+  const familyRecurringByDay = useFamilyEventRecurringByDay();
+  const familyOneTime = useFamilyEventOneTimeBlocks();
+  const kidRecurringEventsByDay = useMemo(() => {
+    const map: Record<number, FamilyEvent[]> = {};
+    for (let d = 0; d < 7; d++) {
+      map[d] = (familyRecurringByDay[d] ?? []).filter(
+        (e) => e.assigneeType === "kid" && e.assigneeId === kidId,
+      );
+    }
+    return map;
+  }, [familyRecurringByDay, kidId]);
+  const kidOneTimeEvents = useMemo(
+    () =>
+      familyOneTime.filter(
+        (e) => e.assigneeType === "kid" && e.assigneeId === kidId,
+      ),
+    [familyOneTime, kidId],
+  );
 
   const { confirmVisible, requestDelete, confirmDelete, dismissConfirm } = useConfirmDelete();
 
-  // Modal
+  // Block modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
   const [modalDay, setModalDay] = useState(1);
+  // Family-event modal (edit/delete only — new events are created on /calendar)
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<FamilyEvent | null>(null);
 
   const openAdd = (dayOfWeek?: number) => {
     setEditingBlock(null);
@@ -161,6 +283,46 @@ export default function KidScheduleScreen() {
     setModalDay(block.daysOfWeek[0] ?? 0);
     setModalOpen(true);
   };
+
+  const openEditEvent = (event: FamilyEvent) => {
+    setEditingEvent(event);
+    setEventModalOpen(true);
+  };
+
+  // Route a tap from the week/day grid to the right editor.
+  const handleGridPress = useCallback(
+    (id: string, source: "event" | "block") => {
+      if (source === "block") {
+        const block =
+          dayBlocks.find((b) => b.id === id) ??
+          allBlocks.find((b) => b.id === id) ??
+          oneTimeBlocks.find((b) => b.id === id);
+        if (block) openEdit(block);
+      } else {
+        const event =
+          dayEvents.find((e) => e.id === id) ??
+          kidOneTimeEvents.find((e) => e.id === id) ??
+          [...Array(7)].reduce<FamilyEvent | undefined>(
+            (found, _, dow) =>
+              found ?? kidRecurringEventsByDay[dow]?.find((e) => e.id === id),
+            undefined,
+          );
+        if (event) openEditEvent(event);
+      }
+    },
+    [dayBlocks, allBlocks, oneTimeBlocks, dayEvents, kidOneTimeEvents, kidRecurringEventsByDay],
+  );
+
+  // Slot tap (week/day grid) → new schedule block on that date.
+  const handleSlotPress = useCallback(
+    (date: string, _start: number, _end: number) => {
+      setSelectedDate(date);
+      setEditingBlock(null);
+      setModalDay(dayOfWeekFromYMD(date));
+      setModalOpen(true);
+    },
+    [],
+  );
 
   const handleSubmit = (data: {
     title: string;
@@ -180,7 +342,24 @@ export default function KidScheduleScreen() {
     }
   };
 
-  // Build markedDates for calendar
+  const handleEventSubmit = (data: {
+    title: string;
+    assigneeType: AssigneeType;
+    assigneeId?: string;
+    daysOfWeek: number[];
+    startMinutes: number;
+    endMinutes: number;
+    location?: string;
+    isRecurring: boolean;
+    date?: string;
+    reminders?: number[];
+  }) => {
+    if (editingEvent) {
+      updateFamilyEventRemote(editingEvent.id, data);
+    }
+  };
+
+  // Build markedDates: days with this kid's blocks OR kid-assigned events.
   const markedDates = useMemo(() => {
     const marks: Record<string, { dotColor: string }> = {};
     const now = new Date();
@@ -189,24 +368,55 @@ export default function KidScheduleScreen() {
       d.setDate(d.getDate() + offset);
       const ymd = toYMD(d);
       const dow = d.getDay();
-      if (blocksByDay[dow]?.length > 0) {
+      if (
+        blocksByDay[dow]?.length > 0 ||
+        kidRecurringEventsByDay[dow]?.length > 0
+      ) {
         marks[ymd] = { dotColor: kidColor };
       }
     }
     for (const b of oneTimeBlocks) {
       if (b.date) marks[b.date] = { dotColor: kidColor };
     }
+    for (const e of kidOneTimeEvents) {
+      if (e.date) marks[e.date] = { dotColor: kidColor };
+    }
     return marks;
-  }, [blocksByDay, oneTimeBlocks, kidColor]);
+  }, [blocksByDay, oneTimeBlocks, kidRecurringEventsByDay, kidOneTimeEvents, kidColor]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
         <ScrollView contentContainerStyle={styles.container}>
-          {/* Header accent bar */}
+          {/* Header accent bar — with prev/next arrows to switch kids.
+              Plain "row" (not RTL_ROW) to match WeekCalendar's header — RN
+              Web auto-mirrors row in RTL, putting chevron-right on the
+              right visual edge. Arrows hide if there's only one active kid. */}
           <View style={[styles.accentBar, { backgroundColor: kidColor + "22" }]}>
+            {prevKidId ? (
+              <IconButton
+                icon="chevron-right"
+                size={22}
+                iconColor={kidColor}
+                onPress={() => goToKid(prevKidId)}
+                accessibilityLabel={t("kid.prevKid")}
+              />
+            ) : (
+              <View style={styles.accentArrowSpacer} />
+            )}
             <Text style={[styles.accentText, { color: kidColor }]}>
               {kid?.emoji} {t("kid.kidSchedule", { name: kid?.name ?? "" })}
             </Text>
+            {nextKidId ? (
+              <IconButton
+                icon="chevron-left"
+                size={22}
+                iconColor={kidColor}
+                onPress={() => goToKid(nextKidId)}
+                accessibilityLabel={t("kid.nextKid")}
+              />
+            ) : (
+              <View style={styles.accentArrowSpacer} />
+            )}
           </View>
 
           {/* Tabs */}
@@ -220,23 +430,59 @@ export default function KidScheduleScreen() {
             style={styles.tabs}
           />
 
-          {/* --- Calendar View --- */}
+          {/* --- Calendar View (month / week / day) --- */}
           {tab === "calendar" && (
             <>
+              {/* Month / Week / Day sub-toggle — mirrors the main /calendar */}
+              <SegmentedButtons
+                value={calendarView}
+                onValueChange={(v) => setCalendarView(v as CalendarView)}
+                buttons={[
+                  { value: "month", label: t("calendar.monthView"), checkedColor: C.selectText, uncheckedColor: C.textSecondary },
+                  { value: "week", label: t("calendar.weekView"), checkedColor: C.selectText, uncheckedColor: C.textSecondary },
+                  { value: "day", label: t("calendar.dayView"), checkedColor: C.selectText, uncheckedColor: C.textSecondary },
+                ]}
+                style={styles.viewToggle}
+                theme={{ colors: { secondaryContainer: C.selectBg, onSecondaryContainer: C.selectText } }}
+              />
+
               <Card style={styles.card} mode="elevated">
                 <Card.Content>
-                  <MonthCalendar
-                    selectedDate={selectedDate}
-                    onSelectDate={setSelectedDate}
-                    markedDates={markedDates}
-                    accentColor={kidColor}
-                  />
+                  {calendarView === "month" && (
+                    <MonthCalendar
+                      selectedDate={selectedDate}
+                      onSelectDate={setSelectedDate}
+                      markedDates={markedDates}
+                      accentColor={kidColor}
+                    />
+                  )}
+                  {calendarView === "week" && (
+                    <WeekCalendar
+                      selectedDate={selectedDate}
+                      onSelectDate={setSelectedDate}
+                      markedDates={markedDates}
+                      accentColor={kidColor}
+                      kidId={kidId}
+                      onEventPress={handleGridPress}
+                      onSlotPress={handleSlotPress}
+                    />
+                  )}
+                  {calendarView === "day" && (
+                    <DayCalendar
+                      selectedDate={selectedDate}
+                      onSelectDate={setSelectedDate}
+                      accentColor={kidColor}
+                      kidId={kidId}
+                      onEventPress={handleGridPress}
+                      onSlotPress={handleSlotPress}
+                    />
+                  )}
                 </Card.Content>
               </Card>
 
               <SectionHeader label={t("kid.daySchedule", { day: dayName(selectedDow) })} />
 
-              {dayBlocks.length === 0 ? (
+              {dayBlocks.length === 0 && dayEvents.length === 0 ? (
                 <Text style={styles.emptyText}>
                   {t("kid.nothingScheduled", { day: dayName(selectedDow) })}
                 </Text>
@@ -250,6 +496,14 @@ export default function KidScheduleScreen() {
                         kidColor={kidColor}
                         onEdit={() => openEdit(b)}
                         onDelete={() => requestDelete(() => deleteScheduleBlockRemote(b.id))}
+                      />
+                    ))}
+                    {dayEvents.map((e) => (
+                      <KidEventRow
+                        key={e.id}
+                        event={e}
+                        onEdit={() => openEditEvent(e)}
+                        onDelete={() => requestDelete(() => deleteFamilyEventRemote(e.id))}
                       />
                     ))}
                   </Card.Content>
@@ -320,6 +574,24 @@ export default function KidScheduleScreen() {
           defaultDate={tab === "calendar" ? selectedDate : undefined}
           onSubmit={handleSubmit}
         />
+
+        {/* Edit/delete for kid-assigned family events (created on /calendar). */}
+        <FamilyEventModal
+          visible={eventModalOpen}
+          onDismiss={() => {
+            setEventModalOpen(false);
+            setEditingEvent(null);
+          }}
+          editEvent={editingEvent}
+          defaultDaysOfWeek={[selectedDow]}
+          defaultDate={selectedDate}
+          onSubmit={handleEventSubmit}
+          onDelete={
+            editingEvent
+              ? () => requestDelete(() => deleteFamilyEventRemote(editingEvent.id))
+              : undefined
+          }
+        />
         <ConfirmDeleteModal
           visible={confirmVisible}
           onConfirm={confirmDelete}
@@ -335,13 +607,27 @@ const styles = StyleSheet.create({
 
   accentBar: {
     borderRadius: R.md,
-    padding: S.lg,
+    paddingVertical: S.sm,
+    paddingHorizontal: S.sm,
     marginBottom: S.lg,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
   },
-  accentText: { fontSize: 16, fontWeight: "800", textAlign: "center" },
+  accentText: {
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center",
+    flex: 1,
+  },
+  // Reserves the same width as an IconButton so the title stays centered
+  // when only one of prev/next arrows is hidden (shouldn't happen with
+  // cyclic nav, but defends against a single-kid family where both are
+  // null and the centered text would otherwise be the whole row).
+  accentArrowSpacer: { width: 40, height: 40 },
 
   tabs: { marginBottom: S.lg },
+  viewToggle: { marginBottom: S.md },
 
   card: { borderRadius: R.lg, backgroundColor: C.surface, marginBottom: S.lg },
 
