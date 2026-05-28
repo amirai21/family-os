@@ -77,19 +77,32 @@ export default function GroceryScreen() {
   const bought = filtered.filter((g) => g.isBought);
 
   // Group unbought items by subcategory in the family's preferred order.
-  // Items whose stored subcategory isn't in the active list (legacy English
-  // keys, deleted custom names) fall into the "אחר" bucket. Empty groups
-  // are filtered out so the list doesn't show headers for nothing.
+  //
+  // Lookup is tried in two steps for backward compatibility with the
+  // pre-customization data model:
+  //   1. Direct: item.subcategory matches a string in the effective list
+  //      (covers families that already use Hebrew keys end-to-end).
+  //   2. Translated: groceryCategoryLabel(item.subcategory) matches a
+  //      string in the effective list. The DEFAULT_GROCERY_SUBCATEGORIES
+  //      are deliberately aligned with the i18n table, so legacy English
+  //      keys ("Produce", "Dairy", …) land in their proper Hebrew bucket
+  //      without a DB migration.
+  // Anything still unresolved falls into "אחר". Empty buckets render nothing.
   const unboughtGroups = useMemo(() => {
     const order = effectiveSubcategories(customizations, selectedCategory);
     const orderSet = new Set(order);
     const buckets = new Map<string, GroceryItem[]>();
     for (const sub of order) buckets.set(sub, []);
     for (const item of unbought) {
-      const key =
-        item.subcategory && orderSet.has(item.subcategory)
-          ? item.subcategory
-          : OTHER_SUBCATEGORY;
+      let key = OTHER_SUBCATEGORY;
+      if (item.subcategory) {
+        if (orderSet.has(item.subcategory)) {
+          key = item.subcategory;
+        } else {
+          const translated = groceryCategoryLabel(item.subcategory);
+          if (orderSet.has(translated)) key = translated;
+        }
+      }
       buckets.get(key)?.push(item);
     }
     return order

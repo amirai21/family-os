@@ -19,44 +19,48 @@ export interface FamilyCustomizations {
 /**
  * Hebrew defaults used when a family hasn't set its own subcategories yet.
  *
- * Items existing in the DB still carry their old English subcategory keys
- * ("Produce", "Dairy", …). They won't match these Hebrew defaults — they
- * land in the "אחר" (Other) group on the grouped list until the user
- * re-categorizes. Acceptable per the product decision (see commit message).
+ * IMPORTANT — names align EXACTLY with the Hebrew labels in
+ * `src/i18n/he.ts → groceryCategory`. That table maps the legacy English
+ * subcategory keys stored on existing items ("Produce", "Dairy", …) to
+ * Hebrew. By keeping the defaults identical to those labels, the grouping
+ * logic can bucket old items via `groceryCategoryLabel(item.subcategory)`
+ * without a DB migration. If you drift these strings, existing items will
+ * silently fall into the "אחר" bucket — keep them in lockstep with the
+ * i18n table.
  */
 export const DEFAULT_GROCERY_SUBCATEGORIES: Record<ShoppingCategory, string[]> = {
   grocery: [
-    "ירקות ופירות",
-    "מוצרי חלב",
-    "בשר ועוף",
-    "דגים",
-    "מאפים",
-    "קפואים",
-    "חטיפים",
-    "משקאות",
-    "שימורים",
-    "תבלינים ורטבים",
-    "אחר",
+    "ירקות ופירות", // Produce
+    "מוצרי חלב",     // Dairy
+    "בשר",           // Meat
+    "דגים",          // Fish
+    "מאפים",         // Bakery
+    "קפואים",        // Frozen
+    "חטיפים",        // Snacks
+    "משקאות",        // Beverages
+    "שימורים",       // Canned
+    "תבלינים ורטבים", // Spices
+    "אחר",           // Other
   ],
   health: [
-    "תרופות",
-    "ויטמינים",
-    "טיפוח",
-    "תינוקות",
-    "עזרה ראשונה",
-    "פנים",
-    "שיער",
-    "אחר",
+    "תרופות",       // Medications
+    "ויטמינים",     // Vitamins
+    "טיפוח אישי",   // PersonalCare
+    "תינוקות",      // BabyCare
+    "עזרה ראשונה",  // FirstAid
+    "טיפוח עור",    // Skincare
+    "טיפוח שיער",   // HairCare
+    "אחר",          // Other
   ],
   home: [
-    "ניקיון",
-    "כביסה",
-    "מטבח",
-    "אמבטיה",
-    "נייר",
-    "כלים",
-    "עיצוב",
-    "אחר",
+    "ניקיון",       // Cleaning
+    "כביסה",        // Laundry
+    "מטבח",         // Kitchen
+    "אמבטיה",       // Bathroom
+    "מוצרי נייר",   // PaperGoods
+    "כלי עבודה",    // Tools
+    "קישוט ועיצוב", // Decor
+    "אחר",          // Other
   ],
 };
 
