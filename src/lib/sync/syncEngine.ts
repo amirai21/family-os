@@ -18,6 +18,7 @@ import {
   scheduleBlocksApi,
   familyMembersApi,
   familyEventsApi,
+  customizationsApi,
 } from "../api/endpoints";
 import {
   apiToLocalGrocery,
@@ -60,6 +61,7 @@ export async function pullAll(familyIdOverride?: string): Promise<void> {
       scheduleBlocksApi.list(fid),
       familyMembersApi.list(fid),
       familyEventsApi.list(fid),
+      customizationsApi.get(fid),
     ]);
 
     // Log any failures and figure out which endpoints succeeded.
@@ -68,7 +70,7 @@ export async function pullAll(familyIdOverride?: string): Promise<void> {
     // which silently *wiped* the local cache for any failed resource — a flaky
     // network hop would erase your grocery list / events / etc. instead of
     // showing the previous data with a sync-error banner.
-    const names = ["families", "grocery", "notes", "chores", "projects", "kids", "scheduleBlocks", "members", "events"];
+    const names = ["families", "grocery", "notes", "chores", "projects", "kids", "scheduleBlocks", "members", "events", "customizations"];
     const failures = results
       .map((r, i) => (r.status === "rejected" ? i : null))
       .filter((i): i is number => i !== null);
@@ -107,6 +109,14 @@ export async function pullAll(familyIdOverride?: string): Promise<void> {
     applyIfOk(6, apiToLocalScheduleBlock, store.setScheduleBlocks);
     applyIfOk(7, apiToLocalFamilyMember, store.setFamilyMembers);
     applyIfOk(8, apiToLocalFamilyEvent, store.setFamilyEvents);
+    // Customizations is a singleton object (not a list), so applyIfOk's
+    // map-and-set shape doesn't fit — handle it inline.
+    if (results[9].status === "fulfilled") {
+      const value = results[9].value as
+        | import("@src/models/customization").FamilyCustomizations
+        | null;
+      store.setCustomizations(value ?? {});
+    }
     store.setLastSyncedAt(Date.now());
     store.setSyncStatus(failures.length > 0 ? "error" : "idle",
       failures.length > 0 ? "Partial sync" : undefined);

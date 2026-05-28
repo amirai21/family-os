@@ -374,6 +374,26 @@ const he = {
       "קבלו עדכונים ושאלו שאלות על לוח הזמנים, המטלות והקניות של המשפחה — ישירות מטלגרם.\nכל בן משפחה יכול לחבר את הטלגרם שלו בנפרד.",
     connectTelegram: "חבר טלגרם",
     telegramError: "שגיאה ביצירת קוד חיבור",
+    customization: "התאמה אישית",
+    customizationSubtitle: "התאימו את האפליקציה למשפחה שלכם — קטגוריות קניות ועוד",
+    openCustomization: "פתח את ההתאמה האישית",
+  },
+
+  // ── Customization screen ──
+  customization: {
+    title: "התאמה אישית",
+    subtitle:
+      "הגדרות אישיות למשפחה שלכם. ההגדרות נשמרות לכל בני המשפחה ויסונכרנו אוטומטית.",
+    grocerySubcategories: "תת-קטגוריות מכולת",
+    healthSubcategories: "תת-קטגוריות פארם",
+    homeSubcategories: "תת-קטגוריות לבית",
+    subcategoriesHint: "תת-הקטגוריות שיופיעו כשמוסיפים פריט וקובעות את הקיבוץ ברשימת הקניות.",
+    addSubcategory: "הוסף תת-קטגוריה",
+    subcategoryPlaceholder: "שם תת-קטגוריה",
+    deleteSubcategory: "מחק",
+    duplicateError: "תת-קטגוריה בשם הזה כבר קיימת",
+    emptyNameError: "שם לא יכול להיות ריק",
+    otherCategoryLocked: "תת-הקטגוריה \"אחר\" קבועה — היא מאחסנת פריטים שלא קיבלו קטגוריה",
   },
 
   // ── Onboarding ──

@@ -31,9 +31,28 @@ const timestamps = {
 // families
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-family preferences ("customizations" in the UI). Extensible JSONB
+ * blob — new knobs (notification prefs, default views, etc.) land here
+ * rather than adding columns. Defaults are applied client-side when a
+ * key is missing, so existing rows stay backward-compatible after a
+ * shape change.
+ */
+export type FamilyCustomizations = {
+  grocerySubcategories?: {
+    grocery?: string[];
+    health?: string[];
+    home?: string[];
+  };
+};
+
 export const families = pgTable("families", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  customizations: jsonb("customizations")
+    .$type<FamilyCustomizations>()
+    .notNull()
+    .default({}),
   ...timestamps,
 });
 

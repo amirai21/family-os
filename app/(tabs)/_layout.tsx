@@ -21,6 +21,14 @@ export default function TabLayout() {
           title: "",
         }}
       />
+      <Tabs.Screen
+        name="customization"
+        options={{
+          href: null,
+          headerShown: true,
+          title: t("customization.title"),
+        }}
+      />
     </Tabs>
   );
 }

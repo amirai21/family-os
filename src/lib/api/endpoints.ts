@@ -38,6 +38,24 @@ export const familyApi = {
 };
 
 // ---------------------------------------------------------------------------
+// Customizations  (per-family preferences blob)
+// ---------------------------------------------------------------------------
+
+import type { FamilyCustomizations } from "@src/models/customization";
+
+export const customizationsApi = {
+  get: (familyId: string) =>
+    http.get<FamilyCustomizations>(`/v1/family/${familyId}/customizations`),
+  // The backend replaces the whole JSONB on PUT — always send the complete
+  // object (callers compose from existing state + their patch).
+  put: (familyId: string, data: FamilyCustomizations) =>
+    http.put<FamilyCustomizations>(
+      `/v1/family/${familyId}/customizations`,
+      data,
+    ),
+};
+
+// ---------------------------------------------------------------------------
 // Grocery
 // ---------------------------------------------------------------------------
 

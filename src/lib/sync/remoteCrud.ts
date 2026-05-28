@@ -29,6 +29,7 @@ import {
   scheduleBlocksApi,
   familyMembersApi,
   familyEventsApi,
+  customizationsApi,
 } from "../api/endpoints";
 import {
   localToApiGrocery,
@@ -84,6 +85,25 @@ export function updateFamilyNameRemote(name: string) {
   fireAndForget(
     getFamilyId().then((fid) => familyApi.update(fid, { name })),
     "Update family name",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Customizations (per-family preferences)
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace the family's customizations blob. Optimistic: store updates
+ * instantly, then PUT goes out in the background. On error the snackbar
+ * shows; next pullAll will reconcile from the server.
+ */
+export function updateCustomizationsRemote(
+  next: import("@src/models/customization").FamilyCustomizations,
+) {
+  useFamilyStore.getState().setCustomizations(next);
+  fireAndForget(
+    getFamilyId().then((fid) => customizationsApi.put(fid, next)),
+    "Update customizations",
   );
 }
 

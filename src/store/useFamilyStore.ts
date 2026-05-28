@@ -9,6 +9,7 @@ import type { ScheduleBlock, BlockType } from "@src/models/schedule";
 import type { Kid } from "@src/models/kid";
 import type { FamilyMember, MemberRole } from "@src/models/familyMember";
 import type { FamilyEvent, AssigneeType } from "@src/models/familyEvent";
+import type { FamilyCustomizations } from "@src/models/customization";
 import { makeId } from "@src/utils/id";
 
 /**
@@ -79,6 +80,11 @@ interface FamilyState {
   // Home screen UI state — which sections are expanded
   homeSections: HomeSectionsState;
 
+  // Per-family preferences (extensible JSONB; see models/customization.ts).
+  // Empty object = "use defaults". Replaced wholesale on PUT — the
+  // settings screen always sends the complete object.
+  customizations: FamilyCustomizations;
+
   // Sync metadata
   syncStatus: SyncStatus;
   syncError: string | null;
@@ -89,6 +95,9 @@ interface FamilyState {
 
   // Home sections (collapse/expand)
   toggleHomeSection: (key: HomeSectionKey) => void;
+
+  // Customizations (full replace — see comment on the field)
+  setCustomizations: (next: FamilyCustomizations) => void;
 
   // Family name
   setFamilyName: (name: string) => void;
@@ -232,6 +241,11 @@ export const useFamilyStore = create<FamilyState>()(
       // can collapse what they don't want to see.
       homeSections: { notes: true, chores: true, projects: true },
 
+      // Empty until pullAll fetches the family's saved customizations.
+      // Consumers should read effective values via effectiveSubcategories()
+      // from models/customization.ts, which falls back to Hebrew defaults.
+      customizations: {},
+
       syncStatus: "idle" as SyncStatus,
       syncError: null,
       lastSyncedAt: null,
@@ -246,6 +260,10 @@ export const useFamilyStore = create<FamilyState>()(
         set((state) => ({
           homeSections: { ...state.homeSections, [key]: !state.homeSections[key] },
         })),
+
+      /* ── Customizations ── */
+
+      setCustomizations: (next) => set({ customizations: next }),
 
       /* ── Family name ── */
 
@@ -563,7 +581,7 @@ export const useFamilyStore = create<FamilyState>()(
     }),
     {
       name: "family-os-store-v2",
-      version: 11,
+      version: 12,
       storage: createJSONStorage(() => safeStorage),
       onRehydrateStorage: () => (_state, error) => {
         // Last-line-of-defense: if anything else in the rehydrate path throws
@@ -589,6 +607,7 @@ export const useFamilyStore = create<FamilyState>()(
         lastSyncedAt: state.lastSyncedAt,
         onboardingComplete: state.onboardingComplete,
         homeSections: state.homeSections,
+        customizations: state.customizations,
       }),
       migrate: (persisted: any, version: number) => {
         if (version < 2) {
@@ -667,6 +686,11 @@ export const useFamilyStore = create<FamilyState>()(
             chores: true,
             projects: true,
           };
+        }
+        if (version < 12) {
+          // Add customizations blob — empty means "use Hebrew defaults".
+          // pullAll will overwrite with the server's value on next sync.
+          persisted.customizations = persisted.customizations ?? {};
         }
         return persisted;
       },

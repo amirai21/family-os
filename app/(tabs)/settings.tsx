@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Pressable, Linking, Alert, Share, Platfor
 import { Card, Text, IconButton, Divider, TextInput, Button } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
+import { useRouter } from "expo-router";
 import { useFamilyStore } from "@src/store/useFamilyStore";
 import { useAuthStore } from "@src/auth/useAuthStore";
 import {
@@ -117,6 +118,7 @@ function KidRow({
 // ── Settings Screen ──
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const familyMembers = useFamilyStore((s) => s.familyMembers);
   const kids = useFamilyStore((s) => s.kids);
   const familyName = useFamilyStore((s) => s.familyName);
@@ -450,6 +452,25 @@ export default function SettingsScreen() {
               buttonColor={C.selectText}
             >
               {t("settings.connectTelegram")}
+            </Button>
+          </Card.Content>
+        </Card>
+
+        {/* ── Customization card — links to /customization ── */}
+        <SectionHeader label={t("settings.customization")} />
+        <Card style={styles.card} mode="elevated">
+          <Card.Content>
+            <Text style={styles.subtitle}>
+              {t("settings.customizationSubtitle")}
+            </Text>
+            <Button
+              mode="contained"
+              onPress={() => router.push("/customization" as any)}
+              icon="tune"
+              style={styles.telegramBtn}
+              buttonColor={C.purple}
+            >
+              {t("settings.openCustomization")}
             </Button>
           </Card.Content>
         </Card>

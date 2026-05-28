@@ -56,3 +56,36 @@ familyRoutes.put("/:familyId", async (c) => {
   if (!row) return c.json({ error: "Not found" }, 404);
   return c.json(row);
 });
+
+// ── Customizations ──────────────────────────────────────────────────────
+//
+// Per-family preferences blob (JSONB column on `families`). Currently
+// holds `grocerySubcategories`; extensible — new knobs land here without a
+// schema migration. The frontend always sends the COMPLETE customizations
+// object on PUT (replace, not deep-merge) so there's no ambiguity about
+// "did the client mean to clear this nested key or just not send it."
+
+familyRoutes.get("/:familyId/customizations", async (c) => {
+  const familyId = c.req.param("familyId");
+  const [row] = await db
+    .select({ customizations: families.customizations })
+    .from(families)
+    .where(eq(families.id, familyId));
+  if (!row) return c.json({ error: "Not found" }, 404);
+  return c.json(row.customizations);
+});
+
+familyRoutes.put("/:familyId/customizations", async (c) => {
+  const familyId = c.req.param("familyId");
+  const body = await c.req.json();
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return c.json({ error: "Body must be a JSON object" }, 400);
+  }
+  const [row] = await db
+    .update(families)
+    .set({ customizations: body, updatedAt: new Date() })
+    .where(eq(families.id, familyId))
+    .returning({ customizations: families.customizations });
+  if (!row) return c.json({ error: "Not found" }, 404);
+  return c.json(row.customizations);
+});

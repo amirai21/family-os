@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, Platform, Pressable } from "react-native";
 import {
   Card,
@@ -6,7 +6,6 @@ import {
   Button,
   Checkbox,
   IconButton,
-  Chip,
   Divider,
   SegmentedButtons,
 } from "react-native-paper";
@@ -23,6 +22,10 @@ import FamilyBadge from "@src/components/FamilyBadge";
 import { t, groceryCategoryLabel, shoppingCategoryLabel } from "@src/i18n";
 import type { GroceryItem, ShoppingCategory } from "@src/models/grocery";
 import { SHOPPING_CATEGORIES } from "@src/models/grocery";
+import {
+  effectiveSubcategories,
+  OTHER_SUBCATEGORY,
+} from "@src/models/customization";
 import { RTL_ROW, TEXT_RIGHT } from "@src/ui/rtl";
 import { C, R, S, SHADOW } from "@src/ui/tokens";
 
@@ -63,6 +66,7 @@ const EMPTY_KEYS: Record<ShoppingCategory, string> = {
 
 export default function GroceryScreen() {
   const grocery = useFamilyStore((s) => s.grocery);
+  const customizations = useFamilyStore((s) => s.customizations);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<GroceryItem | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ShoppingCategory>("grocery");
@@ -71,6 +75,27 @@ export default function GroceryScreen() {
   const filtered = grocery.filter((g) => g.shoppingCategory === selectedCategory);
   const unbought = filtered.filter((g) => !g.isBought);
   const bought = filtered.filter((g) => g.isBought);
+
+  // Group unbought items by subcategory in the family's preferred order.
+  // Items whose stored subcategory isn't in the active list (legacy English
+  // keys, deleted custom names) fall into the "אחר" bucket. Empty groups
+  // are filtered out so the list doesn't show headers for nothing.
+  const unboughtGroups = useMemo(() => {
+    const order = effectiveSubcategories(customizations, selectedCategory);
+    const orderSet = new Set(order);
+    const buckets = new Map<string, GroceryItem[]>();
+    for (const sub of order) buckets.set(sub, []);
+    for (const item of unbought) {
+      const key =
+        item.subcategory && orderSet.has(item.subcategory)
+          ? item.subcategory
+          : OTHER_SUBCATEGORY;
+      buckets.get(key)?.push(item);
+    }
+    return order
+      .map((sub) => ({ subcategory: sub, items: buckets.get(sub) ?? [] }))
+      .filter((g) => g.items.length > 0);
+  }, [unbought, customizations, selectedCategory]);
 
   const segmentButtons = SHOPPING_CATEGORIES.map((cat) => ({
     value: cat,
@@ -119,42 +144,55 @@ export default function GroceryScreen() {
               </Text>
             )}
 
-            {unbought.map((item) => (
-              <View
-                key={item.id}
-                style={[styles.row, hoveredItemId === item.id && styles.rowHover]}
-                {...(Platform.OS === "web" ? {
-                  onPointerEnter: () => setHoveredItemId(item.id),
-                  onPointerLeave: () => setHoveredItemId(null),
-                } : {} as any)}
-              >
-                <Checkbox
-                  status="unchecked"
-                  onPress={() => toggleGroceryBoughtRemote(item.id)}
-                />
-                <View style={styles.rowText}>
-                  <Text style={styles.itemTitle}>{item.title}</Text>
-                  <View style={styles.meta}>
-                    {item.subcategory ? (
-                      <Chip compact textStyle={styles.chipText} style={styles.chip}>
-                        {SUBCATEGORY_EMOJI[item.subcategory] ?? ""} {groceryCategoryLabel(item.subcategory)}
-                      </Chip>
-                    ) : null}
-                    {item.qty ? (
-                      <Text style={styles.qty}>x{item.qty}</Text>
-                    ) : null}
-                  </View>
+            {/* Grouped by subcategory in the family's preferred order. The
+                row-level chip showing the subcategory is now redundant (the
+                group header carries the same info), so we drop it inside
+                groups to reduce visual noise. */}
+            {unboughtGroups.map((group, gi) => (
+              <View key={group.subcategory}>
+                <View style={styles.groupHeaderRow}>
+                  <Text style={styles.groupHeaderText}>
+                    {SUBCATEGORY_EMOJI[group.subcategory] ?? ""}{" "}
+                    {groceryCategoryLabel(group.subcategory)}
+                  </Text>
+                  <Text style={styles.groupHeaderCount}>{group.items.length}</Text>
                 </View>
-                <IconButton
-                  icon="pencil-outline"
-                  size={18}
-                  onPress={() => setEditingItem(item)}
-                />
-                <IconButton
-                  icon="trash-can-outline"
-                  size={18}
-                  onPress={() => deleteGroceryRemote(item.id)}
-                />
+                {group.items.map((item) => (
+                  <View
+                    key={item.id}
+                    style={[styles.row, hoveredItemId === item.id && styles.rowHover]}
+                    {...(Platform.OS === "web" ? {
+                      onPointerEnter: () => setHoveredItemId(item.id),
+                      onPointerLeave: () => setHoveredItemId(null),
+                    } : {} as any)}
+                  >
+                    <Checkbox
+                      status="unchecked"
+                      onPress={() => toggleGroceryBoughtRemote(item.id)}
+                    />
+                    <View style={styles.rowText}>
+                      <Text style={styles.itemTitle}>{item.title}</Text>
+                      {item.qty ? (
+                        <View style={styles.meta}>
+                          <Text style={styles.qty}>x{item.qty}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <IconButton
+                      icon="pencil-outline"
+                      size={18}
+                      onPress={() => setEditingItem(item)}
+                    />
+                    <IconButton
+                      icon="trash-can-outline"
+                      size={18}
+                      onPress={() => deleteGroceryRemote(item.id)}
+                    />
+                  </View>
+                ))}
+                {gi < unboughtGroups.length - 1 && (
+                  <Divider style={styles.groupDivider} />
+                )}
               </View>
             ))}
 
@@ -275,6 +313,31 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 10, lineHeight: 14 },
   qty: { fontSize: 12, color: C.textSecondary, textAlign: TEXT_RIGHT },
   divider: { marginVertical: S.md },
+
+  // Group section header — emoji + Hebrew label on the right, item count on
+  // the left. RTL_ROW so the order is right-to-left visually.
+  groupHeaderRow: {
+    flexDirection: RTL_ROW,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: S.sm,
+    paddingTop: S.sm,
+    paddingBottom: S.xs,
+  },
+  groupHeaderText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.textPrimary,
+    textAlign: TEXT_RIGHT,
+    writingDirection: "rtl",
+  },
+  groupHeaderCount: {
+    fontSize: 11,
+    color: C.textMuted,
+    minWidth: 18,
+    textAlign: "center",
+  },
+  groupDivider: { marginVertical: S.sm, opacity: 0.4 },
   boughtHeader: {
     flexDirection: RTL_ROW,
     justifyContent: "space-between",
